@@ -216,6 +216,43 @@ POST /sell/inventory/v1/offer/{offerId}/publish
 Returns: { listingId }
 ```
 
+### 6. Optional: Upload Images to eBay Picture Services (EPS)
+```
+POST Trading API UploadSiteHostedPictures (URL-based)
+Header: X-EBAY-API-CALL-NAME: UploadSiteHostedPictures
+Body: <ExternalPictureURL>https://...</ExternalPictureURL>
+Returns: <FullURL>https://i.ebayimg.com/...</FullURL>
+```
+
+When enabled, publish flow converts source image URLs to EPS-hosted URLs first, then sends those URLs in `product.imageUrls`.
+
+---
+
+## eBay Image Hosting Mode (New)
+
+### Enable EPS-hosted image upload in publish flow
+Add this to `.env`:
+
+```bash
+EBAY_USE_EPS_IMAGES=true
+# Optional
+EBAY_SITE_ID=0
+EBAY_COMPATIBILITY_LEVEL=1231
+```
+
+### Test endpoint for URL-based EPS upload
+```
+POST /api/ebay-upload-images
+Body: { "imageUrls": ["https://.../image1.jpg", "https://.../image2.webp"] }
+```
+
+Example:
+```bash
+curl -X POST http://localhost:3001/api/ebay-upload-images \
+  -H "Content-Type: application/json" \
+  -d '{"imageUrls":["https://i.ebayimg.com/images/g/FA0AAOSwT-9kPTty/s-l1600.webp"]}'
+```
+
 ---
 
 ## Data Persistence in data.json

@@ -569,6 +569,70 @@
         </button>
       </div>
     </div>
+
+    <div class="admin-config-section" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(2, 6, 23, 0.5); border-radius: 0.9rem; border: 1px solid #111827;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+        <div>
+          <div style="font-size: 0.95rem; font-weight: 600;">Admin Configuration (Media + Marketing)</div>
+          <div style="font-size: 0.78rem; color: var(--muted);">Manage eBay Media/Marketing runtime config and apply without server restart.</div>
+        </div>
+        <div id="adminConfigStatus" style="font-size: 0.78rem; color: var(--muted);">Not loaded</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:0.6rem;">
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Media API Base URL
+          <input id="cfgMediaBaseUrl" type="text" placeholder="https://media-api.example.com" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Media API Key
+          <input id="cfgMediaApiKey" type="password" placeholder="Optional" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Media Create Path
+          <input id="cfgMediaCreatePath" type="text" placeholder="/videos/create" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Video Duration (sec)
+          <input id="cfgVideoDuration" type="number" min="6" max="60" value="18" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Max Images for Video
+          <input id="cfgMaxImages" type="number" min="2" max="24" value="12" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Video Style
+          <input id="cfgVideoStyle" type="text" value="product-showcase" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Marketing Webhook URL
+          <input id="cfgMarketingWebhook" type="text" placeholder="https://your-webhook-url" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Marketplace ID
+          <input id="cfgMarketplaceId" type="text" value="EBAY_US" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Marketing Retry Attempts
+          <input id="cfgMarketingRetries" type="number" min="1" max="6" value="3" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">Marketing Retry Delay (ms)
+          <input id="cfgMarketingDelay" type="number" min="250" max="10000" value="1000" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">eBay Compatibility Level
+          <input id="cfgCompatibilityLevel" type="text" value="1231" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+        <label style="margin:0; font-size:0.78rem; color:var(--muted);">eBay Site ID
+          <input id="cfgSiteId" type="text" value="0" style="width:100%; margin-top:0.3rem; background:#020617; color:var(--text); border:1px solid #1f2937; border-radius:0.55rem; padding:0.45rem 0.55rem;">
+        </label>
+      </div>
+
+      <div style="display:flex; gap:0.8rem; margin-top:0.8rem; flex-wrap:wrap; align-items:center;">
+        <label style="display:flex; gap:0.4rem; align-items:center; font-size:0.78rem; color:var(--muted);"><input id="cfgEnableMediaVideo" type="checkbox" checked> Enable Media Video</label>
+        <label style="display:flex; gap:0.4rem; align-items:center; font-size:0.78rem; color:var(--muted);"><input id="cfgEnableMarketing" type="checkbox" checked> Enable Marketing Engine</label>
+        <label style="display:flex; gap:0.4rem; align-items:center; font-size:0.78rem; color:var(--muted);"><input id="cfgUseEpsImages" type="checkbox"> Use eBay EPS Images</label>
+      </div>
+
+      <div style="display:flex; gap:0.6rem; margin-top:0.9rem; flex-wrap:wrap;">
+        <button type="button" id="cfgLoadBtn" style="border:1px solid #1f2937; background:#0b1220; color:var(--text); border-radius:999px; padding:0.45rem 0.95rem; cursor:pointer;">Load</button>
+        <button type="button" id="cfgSaveBtn" style="border:1px solid #1f2937; background:#0b1220; color:var(--text); border-radius:999px; padding:0.45rem 0.95rem; cursor:pointer;">Save</button>
+        <button type="button" id="cfgApplyBtn" style="border:none; background:linear-gradient(135deg,#4f46e5,#6366f1); color:#fff; border-radius:999px; padding:0.45rem 0.95rem; cursor:pointer;">Apply Runtime</button>
+        <button type="button" id="cfgTestBtn" style="border:1px solid #1f2937; background:#0b1220; color:var(--text); border-radius:999px; padding:0.45rem 0.95rem; cursor:pointer;">Test eBay Media/Marketing APIs</button>
+      </div>
+      <pre id="adminConfigTestOutput" style="display:none; margin-top:0.7rem; background:#020617; border:1px solid #1f2937; border-radius:0.55rem; color:#cbd5e1; padding:0.65rem; max-height:220px; overflow:auto; font-size:0.75rem;"></pre>
+    </div>
+
     <form id="scrapeForm">
       <label for="itemsInput">Item number, Link, Custom label (SKU)</label>
       <div class="textarea-wrapper">
@@ -614,6 +678,121 @@
     const resultsContainer = document.getElementById('results');
     const resultCount = document.getElementById('resultCount');
     const resultsError = document.getElementById('resultsError');
+
+    const adminConfigStatus = document.getElementById('adminConfigStatus');
+    const adminConfigTestOutput = document.getElementById('adminConfigTestOutput');
+
+    function collectAdminConfigFromUi() {
+      return {
+        media: {
+          enableMediaVideo: document.getElementById('cfgEnableMediaVideo').checked,
+          mediaApiBaseUrl: document.getElementById('cfgMediaBaseUrl').value.trim(),
+          mediaApiKey: document.getElementById('cfgMediaApiKey').value.trim(),
+          mediaCreatePath: document.getElementById('cfgMediaCreatePath').value.trim() || '/videos/create',
+          maxImagesForVideo: Number(document.getElementById('cfgMaxImages').value || 12),
+          videoDurationSeconds: Number(document.getElementById('cfgVideoDuration').value || 18),
+          style: document.getElementById('cfgVideoStyle').value.trim() || 'product-showcase'
+        },
+        marketing: {
+          enableMarketingEngine: document.getElementById('cfgEnableMarketing').checked,
+          marketingWebhookUrl: document.getElementById('cfgMarketingWebhook').value.trim(),
+          marketingRetryAttempts: Number(document.getElementById('cfgMarketingRetries').value || 3),
+          marketingRetryDelayMs: Number(document.getElementById('cfgMarketingDelay').value || 1000),
+          marketplaceId: document.getElementById('cfgMarketplaceId').value.trim() || 'EBAY_US'
+        },
+        ebay: {
+          useEpsImages: document.getElementById('cfgUseEpsImages').checked,
+          compatibilityLevel: document.getElementById('cfgCompatibilityLevel').value.trim() || '1231',
+          siteId: document.getElementById('cfgSiteId').value.trim() || '0'
+        }
+      };
+    }
+
+    function applyAdminConfigToUi(config) {
+      const media = config?.media || {};
+      const marketing = config?.marketing || {};
+      const ebay = config?.ebay || {};
+
+      document.getElementById('cfgEnableMediaVideo').checked = !!media.enableMediaVideo;
+      document.getElementById('cfgMediaBaseUrl').value = media.mediaApiBaseUrl || '';
+      document.getElementById('cfgMediaApiKey').value = media.mediaApiKey || '';
+      document.getElementById('cfgMediaCreatePath').value = media.mediaCreatePath || '/videos/create';
+      document.getElementById('cfgMaxImages').value = media.maxImagesForVideo ?? 12;
+      document.getElementById('cfgVideoDuration').value = media.videoDurationSeconds ?? 18;
+      document.getElementById('cfgVideoStyle').value = media.style || 'product-showcase';
+
+      document.getElementById('cfgEnableMarketing').checked = !!marketing.enableMarketingEngine;
+      document.getElementById('cfgMarketingWebhook').value = marketing.marketingWebhookUrl || '';
+      document.getElementById('cfgMarketingRetries').value = marketing.marketingRetryAttempts ?? 3;
+      document.getElementById('cfgMarketingDelay').value = marketing.marketingRetryDelayMs ?? 1000;
+      document.getElementById('cfgMarketplaceId').value = marketing.marketplaceId || 'EBAY_US';
+
+      document.getElementById('cfgUseEpsImages').checked = !!ebay.useEpsImages;
+      document.getElementById('cfgCompatibilityLevel').value = ebay.compatibilityLevel || '1231';
+      document.getElementById('cfgSiteId').value = ebay.siteId || '0';
+    }
+
+    async function loadAdminConfig() {
+      adminConfigStatus.textContent = 'Loading...';
+      try {
+        const response = await fetch('/api/admin/config');
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.success) throw new Error(body.error || 'Failed to load configuration');
+
+        applyAdminConfigToUi(body.config || {});
+        adminConfigStatus.innerHTML = `<span style="color:#34d399;">Loaded (${escapeHtml(body.source || 'unknown')})</span>`;
+      } catch (error) {
+        adminConfigStatus.innerHTML = `<span style="color:#f87171;">${escapeHtml(error.message || 'Load failed')}</span>`;
+      }
+    }
+
+    async function saveAdminConfig() {
+      adminConfigStatus.textContent = 'Saving...';
+      try {
+        const payload = collectAdminConfigFromUi();
+        const response = await fetch('/api/admin/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.success) throw new Error(body.error || 'Failed to save configuration');
+
+        adminConfigStatus.innerHTML = '<span style="color:#34d399;">Saved</span>';
+      } catch (error) {
+        adminConfigStatus.innerHTML = `<span style="color:#f87171;">${escapeHtml(error.message || 'Save failed')}</span>`;
+      }
+    }
+
+    async function applyAdminConfigRuntime() {
+      adminConfigStatus.textContent = 'Applying...';
+      try {
+        const payload = collectAdminConfigFromUi();
+        const response = await fetch('/api/admin/config/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.success) throw new Error(body.error || 'Failed to apply runtime configuration');
+
+        adminConfigStatus.innerHTML = '<span style="color:#34d399;">Applied to runtime</span>';
+      } catch (error) {
+        adminConfigStatus.innerHTML = `<span style="color:#f87171;">${escapeHtml(error.message || 'Apply failed')}</span>`;
+      }
+    }
+
+    async function testEbayMediaMarketingApis() {
+      adminConfigTestOutput.style.display = 'block';
+      adminConfigTestOutput.textContent = 'Testing eBay Media and Marketing APIs...';
+      try {
+        const response = await fetch('/api/admin/config/test-ebay');
+        const body = await response.json().catch(() => ({}));
+        adminConfigTestOutput.textContent = JSON.stringify(body, null, 2);
+      } catch (error) {
+        adminConfigTestOutput.textContent = `Test failed: ${error.message || 'Unknown error'}`;
+      }
+    }
 
     function setLoading(isLoading) {
       if (isLoading) {
@@ -876,8 +1055,17 @@
         }
 
         const data = isJson ? await response.json() : await response.text();
-        if (typeof data !== 'object' || !Array.isArray(data)) throw new Error('Invalid response from server');
-        renderResults(data);
+        let results = [];
+
+        if (Array.isArray(data)) {
+          results = data;
+        } else if (data && typeof data === 'object' && Array.isArray(data.results)) {
+          results = data.results;
+        } else {
+          throw new Error('Invalid response from server');
+        }
+
+        renderResults(results);
       } catch (error) {
         console.error('Scrape request failed:', error);
         resultsSection.style.display = 'block';
@@ -930,6 +1118,13 @@
         validateSpinner.style.display = 'none';
       }
     }
+
+    document.getElementById('cfgLoadBtn').addEventListener('click', loadAdminConfig);
+    document.getElementById('cfgSaveBtn').addEventListener('click', saveAdminConfig);
+    document.getElementById('cfgApplyBtn').addEventListener('click', applyAdminConfigRuntime);
+    document.getElementById('cfgTestBtn').addEventListener('click', testEbayMediaMarketingApis);
+
+    loadAdminConfig();
   </script>
 </body>
 </html>

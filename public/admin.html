@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strapey - Enterprise Platform</title>
+  <style>
+    :root {
+      --color-primary: #6366f1;
+      --color-primary-dark: #4f46e5;
+      --color-accent: #22c55e;
+      --color-danger: #ef4444;
+      --color-warning: #f59e0b;
+      --color-info: #0ea5e9;
+      
+      color-scheme: light;
+      
+      /* Light mode colors */
+      --bg-primary: #ffffff;
+      --bg-secondary: #f9fafb;
+      --bg-tertiary: #f3f4f6;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --text-tertiary: #9ca3af;
+      --border-color: #e5e7eb;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    html[data-theme="dark"] {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-tertiary: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-tertiary: #94a3b8;
+      --border-color: #334155;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+
+    /* Main Layout */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: 60px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Header */
+    header {
+      grid-column: 1 / -1;
+      background-color: var(--bg-primary);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      box-shadow: var(--shadow);
+      z-index: 100;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .app-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      color: var(--text-primary);
+      padding: 8px;
+      border-radius: 6px;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background-color: var(--bg-tertiary);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: var(--color-primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Sidebar */
+    aside {
+      background-color: var(--bg-primary);
+      border-right: 1px solid var(--border-color);
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .sidebar-section {
+      margin-bottom: 24px;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      padding: 0 12px;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background-color: rgba(99, 102, 241, 0.1);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      font-weight: 600;
+    }
+
+    .nav-icon {
+      width: 20px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    /* Main Content */
+    main {
+      overflow-y: auto;
+      background-color: var(--bg-secondary);
+      padding: 24px;
+    }
+
+    /* Page Structure */
+    .page-header {
+      margin-bottom: 24px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* Card */
+    .card {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .stat-change {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+    }
+
+    /* Table */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background-color: var(--bg-secondary);
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    tbody tr:hover {
+      background-color: var(--bg-secondary);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background-color: var(--color-primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--color-primary-dark);
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border-color);
+    }
+
+    .btn-danger {
+      background-color: var(--color-danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: #dc2626;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-success {
+      background-color: rgba(34, 197, 94, 0.2);
+      color: var(--color-accent);
+    }
+
+    .badge-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      color: var(--color-warning);
+    }
+
+    .badge-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: var(--color-danger);
+    }
+
+    .badge-info {
+      background-color: rgba(14, 165, 233, 0.2);
+      color: var(--color-info);
+    }
+
+    .badge-primary {
+      background-color: rgba(99, 102, 241, 0.2);
+      color: var(--color-primary);
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background-color: var(--bg-primary);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .modal-header {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    /* Alert */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+
+    .alert-success {
+      background-color: rgba(34, 197, 94, 0.1);
+      color: var(--color-accent);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .alert-error {
+      background-color: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .alert-warning {
+      background-color: rgba(245, 158, 11, 0.1);
+      color: var(--color-warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border-color);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        display: none;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-title {
+        font-size: 24px;
+      }
+    }
+
+    /* Hide pages */
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Header -->
+    <header>
+      <div class="header-left">
+        <div class="logo">📦</div>
+        <div>
+          <div class="app-title">Strapey Enterprise Platform</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+          <span id="theme-icon">🌙</span>
+        </button>
+        <div class="user-menu">
+          <div class="user-avatar">A</div>
+          <span>Admin</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside>
+      <div class="sidebar-section">
+        <div class="sidebar-title">Workspace</div>
+        <a class="nav-item active" href="#" onclick="showPage('dashboard', event)">
+          <span class="nav-icon">📊</span>
+          <span>Dashboard</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Operations</div>
+        <a class="nav-item" href="#" onclick="showPage('products', event)">
+          <span class="nav-icon">📦</span>
+          <span>Products</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('orders', event)">
+          <span class="nav-icon">🛒</span>
+          <span>Orders</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('inventory', event)">
+          <span class="nav-icon">📋</span>
+          <span>Inventory</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('shipping', event)">
+          <span class="nav-icon">🚚</span>
+          <span>Shipping</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Marketing</div>
+        <a class="nav-item" href="#" onclick="showPage('marketing', event)">
+          <span class="nav-icon">📢</span>
+          <span>Campaigns</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('social', event)">
+          <span class="nav-icon">🌐</span>
+          <span>Social</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('analytics', event)">
+          <span class="nav-icon">📈</span>
+          <span>Analytics</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Integrations</div>
+        <a class="nav-item" href="#" onclick="showPage('integrations', event)">
+          <span class="nav-icon">🔗</span>
+          <span>Channels</span>
+        </a>
+        <a class="nav-item" href="#" onclick="showPage('settings', event)">
+          <span class="nav-icon">⚙️</span>
+          <span>Settings</span>
+        </a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Tools</div>
+        <a class="nav-item" href="#" onclick="showPage('scraper', event)">
+          <span class="nav-icon">🔍</span>
+          <span>eBay Scraper</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main>
+      <!-- Dashboard Page -->
+      <div id="dashboard" class="page active">
+        <div class="page-header">
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-subtitle">Welcome to your Strapey enterprise platform</p>
+        </div>
+
+        <div class="alert alert-success">
+          ✓ Backend API is active and running on port 4000
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Products</div>
+            <div class="stat-value" id="stat-products">0</div>
+            <div class="stat-change">↗ Updated today</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Orders</div>
+            <div class="stat-value" id="stat-orders">0</div>
+            <div class="stat-change">Pending fulfillment</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Inventory Items</div>
+            <div class="stat-value" id="stat-inventory">0</div>
+            <div class="stat-change">In stock</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Channels Connected</div>
+            <div class="stat-value" id="stat-channels">0</div>
+            <div class="stat-change">Active integrations</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">System Status</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>API Server</td>
+                  <td><span class="badge badge-success">Online</span></td>
+                  <td>Running on port 4000</td>
+                </tr>
+                <tr>
+                  <td>Database</td>
+                  <td><span class="badge badge-success">Connected</span></td>
+                  <td>In-memory JSON database</td>
+                </tr>
+                <tr>
+                  <td>Cache</td>
+                  <td><span class="badge badge-success">Active</span></td>
+                  <td>In-memory cache system</td>
+                </tr>
+                <tr>
+                  <td>Job Queue</td>
+                  <td><span class="badge badge-success">Running</span></td>
+                  <td>Background jobs enabled</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Quick Actions</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="showPage('products', event)">
+              ➕ Add Product
+            </button>
+            <button class="btn btn-primary" onclick="showPage('orders', event)">
+              📥 View Orders
+            </button>
+            <button class="btn btn-secondary" onclick="showPage('integrations', event)">
+              🔗 Connect Channel
+            </button>
+            <button class="btn btn-secondary" onclick="showPage('settings', event)">
+              ⚙️ Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products Page -->
+      <div id="products" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Products</h1>
+          <p class="page-subtitle">Manage your product catalog</p>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <button class="btn btn-primary" onclick="openProductModal()">
+            ➕ New Product
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Product Catalog</div>
+          <div id="products-container">
+            <div class="empty-state" id="products-empty">
+              <div class="empty-state-icon">📦</div>
+              <div class="empty-state-title">No products yet</div>
+              <p>Create your first product to get started</p>
+              <button class="btn btn-primary" style="margin-top: 16px;" onclick="openProductModal()">
+                Create Product
+              </button>
+            </div>
+            <div id="products-loading" style="display: none; text-align: center; padding: 48px;">
+              <div class="spinner" style="width: 32px; height: 32px; border-width: 3px; margin: 0 auto 16px;"></div>
+              <p style="color: var(--text-secondary);">Loading products...</p>
+            </div>
+            <div class="table-container" id="products-table" style="display: none;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Image</th>
+                    <th>SKU</th>
+                    <th>Title</th>
+                    <th>Price</th>
+                    <th>Inventory</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="products-tbody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orders Page -->
+      <div id="orders" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Orders</h1>
+          <p class="page-subtitle">Track and manage customer orders</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Recent Orders</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">🛒</div>
+            <div class="empty-state-title">No orders yet</div>
+            <p>Orders will appear here as they come in from your channels</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inventory Page -->
+      <div id="inventory" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Inventory</h1>
+          <p class="page-subtitle">Manage stock levels across channels</p>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <button class="btn btn-primary" onclick="syncInventory()">
+            🔄 Sync Inventory
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Stock Status</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-title">No inventory items</div>
+            <p>Add products to begin tracking inventory</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shipping Page -->
+      <div id="shipping" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Shipping</h1>
+          <p class="page-subtitle">Manage shipments and labels</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Shipping Labels</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">🚚</div>
+            <div class="empty-state-title">No shipments yet</div>
+            <p>Shipping labels will be generated from orders</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marketing Page -->
+      <div id="marketing" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Marketing Campaigns</h1>
+          <p class="page-subtitle">Create and manage promotions</p>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <button class="btn btn-primary" onclick="openCampaignModal()">
+            ➕ New Campaign
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Active Campaigns</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">📢</div>
+            <div class="empty-state-title">No campaigns yet</div>
+            <p>Create your first campaign to promote products</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Social Page -->
+      <div id="social" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Social Media</h1>
+          <p class="page-subtitle">Manage social media content</p>
+        </div>
+
+        <div style="margin-bottom: 24px;">
+          <button class="btn btn-primary">
+            ➕ New Post
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Scheduled Posts</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">🌐</div>
+            <div class="empty-state-title">No scheduled posts</div>
+            <p>Schedule social media content for your products</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics Page -->
+      <div id="analytics" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Analytics</h1>
+          <p class="page-subtitle">Track performance and metrics</p>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Revenue</div>
+            <div class="stat-value">$0</div>
+            <div class="stat-change">This month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Conversion Rate</div>
+            <div class="stat-value">0%</div>
+            <div class="stat-change">Last 30 days</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Avg Order Value</div>
+            <div class="stat-value">$0</div>
+            <div class="stat-change">Per transaction</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Performance Metrics</div>
+          <div class="empty-state">
+            <div class="empty-state-icon">📈</div>
+            <div class="empty-state-title">No data available</div>
+            <p>Analytics will update as you process orders</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrations Page -->
+      <div id="integrations" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Channel Integrations</h1>
+          <p class="page-subtitle">Connect and manage sales channels</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Available Channels</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;">
+            <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 12px;">🛍️</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">eBay</div>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Sell on eBay.com</p>
+              <button class="btn btn-primary btn-sm" onclick="connectChannel('ebay')">Connect</button>
+            </div>
+            <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 12px;">🎨</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">Etsy</div>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Sell on Etsy.com</p>
+              <button class="btn btn-primary btn-sm" onclick="connectChannel('etsy')">Connect</button>
+            </div>
+            <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 12px;">📱</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">Social</div>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Facebook & Instagram</p>
+              <button class="btn btn-primary btn-sm" onclick="connectChannel('social')">Connect</button>
+            </div>
+            <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 12px;">🌐</div>
+              <div style="font-weight: 600; margin-bottom: 4px;">WordPress</div>
+              <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">Your own website</p>
+              <button class="btn btn-primary btn-sm" onclick="connectChannel('wordpress')">Connect</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Page -->
+      <div id="settings" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Settings</h1>
+          <p class="page-subtitle">Configure platform behavior</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">General Settings</div>
+          <form onsubmit="saveSettings(event)">
+            <div class="form-group">
+              <label>Business Name</label>
+              <input type="text" placeholder="Your Business Name">
+            </div>
+            <div class="form-group">
+              <label>Default Currency</label>
+              <select>
+                <option>USD</option>
+                <option>EUR</option>
+                <option>GBP</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Timezone</label>
+              <select>
+                <option>UTC</option>
+                <option>EST</option>
+                <option>PST</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-title">API Credentials</div>
+          <div style="padding: 16px;">
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+              Manage API keys and integration credentials securely.
+            </p>
+            <button class="btn btn-secondary">View API Keys</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- eBay Scraper Page -->
+      <div id="scraper" class="page">
+        <div class="page-header">
+          <h1 class="page-title">eBay Product Scraper</h1>
+          <p class="page-subtitle">Scrape and import eBay listings into your catalog</p>
+        </div>
+
+        <div class="alert alert-info" style="background-color: rgba(14, 165, 233, 0.1); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.3);">
+          ℹ️ Use this tool to scrape eBay listings and automatically add them to your product catalog with enhanced images and metadata.
+        </div>
+
+        <div class="card">
+          <div class="card-title">Scrape eBay Listings</div>
+          <form id="scraperForm" onsubmit="handleScraperSubmit(event)">
+            <div class="form-group">
+              <label>eBay Listing URLs or Item Numbers</label>
+              <textarea id="scraperInput" rows="8" placeholder="Paste eBay URLs or item numbers (one per line):&#10;304569312160&#10;https://www.ebay.com/itm/302710852493&#10;304053796929" style="font-family: monospace;"></textarea>
+              <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
+                You can paste full URLs, item numbers, or a mix of both. Each on a new line.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label>Custom Label (SKU)</label>
+              <input type="text" id="scraperLabel" placeholder="Optional: Enter a label/SKU for these items (leave empty for auto-generation)">
+              <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
+                This label will be used to identify the product group in your catalog.
+              </small>
+            </div>
+
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              <button type="submit" class="btn btn-primary" id="scraperSubmitBtn">
+                <span class="spinner" id="scraperSpinner" style="display: none; width: 14px; height: 14px; border-width: 2px;\"></span>
+                <span id="scraperBtnText">Scrape Listings</span>
+              </button>
+              <button type="button" class="btn btn-secondary" onclick="loadSampleScrapedData()">Load Sample Data</button>
+              <button type="reset" class="btn btn-secondary">Clear</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="scraperResults" style="display: none;">
+          <div class="card">
+            <div class="card-title">Scrape Results</div>
+            <div id="resultsContent"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modals -->
+  <div class="modal" id="productModal">
+    <div class="modal-content">
+      <div class="modal-header">Add New Product</div>
+      <form id="productForm" onsubmit="addProduct(event)">
+        <div class="form-group">
+          <label>Product Name</label>
+          <input type="text" required placeholder="Enter product name">
+        </div>
+        <div class="form-group">
+          <label>SKU</label>
+          <input type="text" required placeholder="Unique product code">
+        </div>
+        <div class="form-group">
+          <label>Price</label>
+          <input type="number" step="0.01" required placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea rows="4" placeholder="Product description"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('productModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="campaignModal">
+    <div class="modal-content">
+      <div class="modal-header">Create Campaign</div>
+      <form id="campaignForm" onsubmit="addCampaign(event)">
+        <div class="form-group">
+          <label>Campaign Name</label>
+          <input type="text" required placeholder="E.g., Spring Sale">
+        </div>
+        <div class="form-group">
+          <label>Channel</label>
+          <select required>
+            <option>eBay</option>
+            <option>Etsy</option>
+            <option>Social</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Discount Type</label>
+          <select required>
+            <option>Percentage</option>
+            <option>Fixed Amount</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Discount Value</label>
+          <input type="number" step="0.01" required placeholder="0.00">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('campaignModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Campaign</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Theme Management
+    function toggleTheme() {
+      const html = document.documentElement;
+      const currentTheme = html.getAttribute('data-theme');
+      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      
+      html.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      
+      const icon = document.getElementById('theme-icon');
+      icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Initialize theme
+    function initTheme() {
+      const saved = localStorage.getItem('theme');
+      const theme = saved || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    // Page Navigation
+    function showPage(pageId, e) {
+      if (e) e.preventDefault();
+      
+      // Hide all pages
+      document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      
+      // Show selected page
+      document.getElementById(pageId).classList.add('active');
+      document.querySelector(`[onclick*="'${pageId}'"]`).classList.add('active');
+      
+      // Load page data
+      loadPageData(pageId);
+    }
+
+    // Modal Management
+    function openProductModal() {
+      document.getElementById('productModal').classList.add('active');
+    }
+
+    function openCampaignModal() {
+      document.getElementById('campaignModal').classList.add('active');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+
+    // Form Handlers
+    function addProduct(e) {
+      e.preventDefault();
+      alert('Product creation will be implemented with API integration');
+      closeModal('productModal');
+    }
+
+    function addCampaign(e) {
+      e.preventDefault();
+      alert('Campaign creation will be implemented with API integration');
+      closeModal('campaignModal');
+    }
+
+    function saveSettings(e) {
+      e.preventDefault();
+      alert('Settings saved!');
+    }
+
+    function syncInventory() {
+      alert('Syncing inventory across all channels...');
+    }
+
+    function connectChannel(channel) {
+      alert(`Connecting ${channel}...`);
+    }
+
+    // Load Products
+    async function loadProducts() {
+      const loading = document.getElementById('products-loading');
+      const empty = document.getElementById('products-empty');
+      const table = document.getElementById('products-table');
+      const tbody = document.getElementById('products-tbody');
+
+      loading.style.display = 'block';
+      empty.style.display = 'none';
+      table.style.display = 'none';
+
+      try {
+        const response = await fetch('http://localhost:3001/api/products');
+        if (!response.ok) throw new Error('Failed to load products');
+        
+        const products = await response.json();
+        
+        loading.style.display = 'none';
+        
+        if (products.length === 0) {
+          empty.style.display = 'block';
+          return;
+        }
+
+        // Render products table
+        tbody.innerHTML = products.map(product => {
+          const firstImage = product.images && product.images.length > 0 ? product.images[0] : '';
+          const imageUrl = firstImage ? `http://localhost:3001/${firstImage}` : '';
+          const price = typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
+          const status = product.publishedLink ? 'Published' : 'Draft';
+          const statusClass = product.publishedLink ? 'badge-success' : 'badge-warning';
+          
+          return `
+            <tr>
+              <td>
+                ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '📦'}
+              </td>
+              <td><strong>${product.sku || 'N/A'}</strong></td>
+              <td style="max-width: 300px;">${product.title || 'Untitled'}</td>
+              <td>${price}</td>
+              <td>${product.inventory || 0}</td>
+              <td><span class="badge ${statusClass}">${status}</span></td>
+              <td>
+                <div style="display: flex; gap: 8px;">
+                  ${product.url ? `<a href="${product.url}" target="_blank" class="btn btn-sm btn-secondary">View</a>` : ''}
+                  ${product.publishedLink ? `<a href="${product.publishedLink}" target="_blank" class="btn btn-sm btn-primary">eBay</a>` : ''}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        
+        table.style.display = 'block';
+      } catch (error) {
+        console.error('Error loading products:', error);
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+        document.querySelector('#products-empty .empty-state-title').textContent = 'Failed to load products';
+        document.querySelector('#products-empty p').textContent = error.message;
+      }
+    }
+
+    // Load Page Data
+    async function loadPageData(pageId) {
+      try {
+        if (pageId === 'dashboard') {
+          updateDashboardStats();
+        } else if (pageId === 'products') {
+          loadProducts();
+        }
+      } catch (e) {
+        console.error('Failed to load page data:', e);
+      }
+    }
+
+    async function updateDashboardStats() {
+      try {
+        const response = await fetch('http://localhost:3001/api/products');
+        if (response.ok) {
+          const products = await response.json();
+          document.getElementById('stat-products').textContent = products.length;
+          const published = products.filter(p => p.publishedLink).length;
+          document.getElementById('stat-inventory').textContent = products.reduce((sum, p) => sum + (p.inventory || 0), 0);
+        }
+      } catch (e) {
+        console.error('Failed to load stats:', e);
+      }
+      document.getElementById('stat-orders').textContent = '0';
+      document.getElementById('stat-channels').textContent = '4';
+    }
+
+    // Handle eBay Scraper Form Submission
+    async function handleScraperSubmit(event) {
+      event.preventDefault();
+      
+      const input = document.getElementById('scraperInput').value.trim();
+      const customLabel = document.getElementById('scraperLabel').value.trim();
+      const submitBtn = document.getElementById('scraperSubmitBtn');
+      const resultsContainer = document.getElementById('scraperResults');
+      
+      if (!input) {
+        alert('Please enter eBay URLs or item numbers');
+        return;
+      }
+
+      // Parse input - could be URLs or item numbers
+      const items = input.split('\n').filter(line => line.trim()).map(line => {
+        const trimmed = line.trim();
+        // If it starts with http, treat as URL; otherwise treat as item number or URL
+        if (trimmed.startsWith('http')) {
+          return {
+            link: trimmed,
+            itemNumber: '',
+            sku: customLabel || ''
+          };
+        } else {
+          // Could be item number or partial URL
+          return {
+            link: trimmed.includes('.com') ? trimmed : `https://www.ebay.com/itm/${trimmed}`,
+            itemNumber: trimmed.includes('.com') ? '' : trimmed,
+            sku: customLabel || ''
+          };
+        }
+      });
+
+      // Show loading state
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Scraping...';
+      resultsContainer.style.display = 'none';
+
+      try {
+        // Send to scraper endpoint
+        const response = await fetch('http://localhost:3001/scrape', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            items: items,
+            customLabel: customLabel || undefined
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Scraper error: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Display results
+        resultsContainer.innerHTML = '';
+        
+        const scrapedItems = result.results || result.data || [];
+        const successfulItems = scrapedItems.filter(item => !item.error);
+        
+        if (result.success && successfulItems.length > 0) {
+          resultsContainer.innerHTML = `
+            <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 12px 0; color: #2e7d32;">✓ Scraping Completed</h4>
+              <p style="margin: 0 0 12px 0; color: #558b2f;">Successfully scraped ${successfulItems.length} item(s)</p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+                ${successfulItems.map(item => `
+                  <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px;">
+                    ${item.images && item.images.length > 0 ? 
+                      `<img src="http://localhost:3001/${item.images[0]}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
+                      : '<div style="width: 100%; height: 150px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">📦</div>'}
+                    <strong style="display: block; margin-bottom: 4px;">${item.title || 'Untitled'}</strong>
+                    <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold;">$${typeof item.price === 'number' ? item.price.toFixed(2) : 'N/A'}</span>
+                    <span style="display: block; color: #666; font-size: 12px; margin-bottom: 8px;">SKU: ${item.sku || item.customLabel || 'N/A'}</span>
+                    ${item.url ? `<a href="${item.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View on eBay →</a>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+              <p style="margin: 16px 0 0 0; color: #558b2f; font-size: 13px;">Items have been added to your Products inventory</p>
+            </div>
+          `;
+        } else if (scrapedItems.length === 0 || successfulItems.length === 0) {
+          resultsContainer.innerHTML = `
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #e65100;">⚠ No Items Found</h4>
+              <p style="margin: 0; color: #bf360c;">Could not find any items matching your criteria. Please check the URLs or item numbers and try again.</p>
+            </div>
+          `;
+        } else {
+          resultsContainer.innerHTML = `
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #e65100;">⚠ Scraping Completed with Issues</h4>
+              <p style="margin: 0; color: #bf360c;">${result.summary?.failed || 0} item(s) failed to scrape. ${result.message || 'Please check the item details and try again.'}</p>
+            </div>
+          `;
+        }
+
+        resultsContainer.style.display = 'block';
+
+        // Refresh products list after short delay
+        setTimeout(() => {
+          loadProducts();
+          updateDashboardStats();
+        }, 1000);
+
+      } catch (error) {
+        console.error('Scraper error:', error);
+        resultsContainer.innerHTML = `
+          <div style="background: #ffebee; border: 1px solid #f44336; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 8px 0; color: #c62828;">✗ Scraping Failed</h4>
+            <p style="margin: 0; color: #b71c1c;">${error.message}</p>
+          </div>
+        `;
+        resultsContainer.style.display = 'block';
+      } finally {
+        // Reset button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Scrape Listings';
+      }
+    }
+
+    // Load sample data for testing
+    async function loadSampleScrapedData() {
+      const resultsContainer = document.getElementById('scraperResults');
+      
+      try {
+        const response = await fetch('http://localhost:3001/api/products');
+        if (!response.ok) throw new Error('Failed to load sample data');
+        
+        const products = await response.json();
+        
+        resultsContainer.innerHTML = '';
+        
+        if (products.length > 0) {
+          resultsContainer.innerHTML = `
+            <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 12px 0; color: #2e7d32;">✓ Sample Data Loaded</h4>
+              <p style="margin: 0 0 12px 0; color: #558b2f;">Showing ${products.length} products from your existing catalog</p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+                ${products.map(item => `
+                  <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px;">
+                    ${item.images && item.images.length > 0 ? 
+                      `<img src="http://localhost:3001/${item.images[0]}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
+                      : '<div style="width: 100%; height: 150px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">📦</div>'}
+                    <strong style="display: block; margin-bottom: 4px;">${item.title || 'Untitled'}</strong>
+                    <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold;">$${typeof item.price === 'number' ? item.price.toFixed(2) : 'N/A'}</span>
+                    <span style="display: block; color: #666; font-size: 12px; margin-bottom: 8px;">SKU: ${item.sku || 'N/A'}</span>
+                    ${item.url ? `<a href="${item.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View on eBay →</a>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+              <p style="margin: 16px 0 0 0; color: #558b2f; font-size: 13px;">These are your existing products. Try scraping a new eBay listing with the form above.</p>
+            </div>
+          `;
+        } else {
+          resultsContainer.innerHTML = `
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #e65100;">ℹ️ No Sample Data</h4>
+              <p style="margin: 0; color: #bf360c;">No products in your catalog yet. Try scraping an eBay listing using the form above.</p>
+            </div>
+          `;
+        }
+
+        resultsContainer.style.display = 'block';
+      } catch (error) {
+        console.error('Error loading sample data:', error);
+        resultsContainer.innerHTML = `
+          <div style="background: #ffebee; border: 1px solid #f44336; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 8px 0; color: #c62828;">✗ Error</h4>
+            <p style="margin: 0; color: #b71c1c;">${error.message}</p>
+          </div>
+        `;
+        resultsContainer.style.display = 'block';
+      }
+    }
+
+    // Close modals on outside click
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.classList.remove('active');
+        }
+      });
+    });
+
+    // Initialize
+    initTheme();
+    updateDashboardStats();
+  </script>
+</body>
+</html>

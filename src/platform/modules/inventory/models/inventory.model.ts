@@ -1,0 +1,1 @@
+export const inventoryModel = { table: 'products', field: 'inventory' };

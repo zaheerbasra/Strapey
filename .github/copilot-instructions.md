@@ -1,97 +1,72 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+# Copilot Instructions for Strapey Project
 
-- [x] Clarify Project Requirements
-	<!-- Requirements provided: Node.js web app for scraping eBay product details. -->
+## Project Summary
 
-- [x] Scaffold the Project
-	<!-- Created package.json, server.js, public/index.html manually due to naming issues with create-next-app. -->
+Strapey is a centralized brand operations platform with multi-channel commerce orchestration. It consists of two components:
 
-- [x] Customize the Project
-	<!-- Implemented scraping logic using Puppeteer, Express server, and frontend form. -->
+1. **Original eBay Scraper** (Express on port 3001): Web scraping and publishing to eBay
+2. **Enterprise Platform** (Fastify on port 4000): TypeScript-based modular architecture for managing products, orders, inventory, shipping, marketing, and social media across multiple channels
 
-- [x] Install Required Extensions
-	<!-- No extensions required. -->
+## Completed Setup
 
-- [x] Compile the Project
-	<!-- Installed dependencies with npm install. -->
+- [x] Project scaffolded with TypeScript compilation (tsconfig.platform.json)
+- [x] All dependencies installed
+- [x] Platform architecture implemented (65+ TypeScript files)
+- [x] Database schema designed (PostgreSQL)
+- [x] Background job system configured (BullMQ + Redis)
+- [x] Security layer implemented (JWT, RBAC, encryption, audit logging)
+- [x] Documentation created (PLATFORM.md)
 
-- [ ] Compile the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Install any missing dependencies.
-	Run diagnostics and resolve any issues.
-	Check for markdown files in project folder for relevant instructions on how to do this.
-	-->
+## Key Technologies
 
-- [ ] Create and Run Task
-	<!--
-	Verify that all previous steps have been completed.
-	Check https://code.visualstudio.com/docs/debugtest/tasks to determine if the project needs a task. If so, use the create_and_run_task to create and launch a task based on package.json, README.md, and project structure.
-	Skip this step otherwise.
-	 -->
+- **Runtime**: Node.js v18+, TypeScript 5.6+
+- **Web Framework**: Fastify 5.0 (platform), Express 4.18 (legacy scraper)
+- **Database**: PostgreSQL with pgcrypto extension
+- **Cache & Queue**: Redis + BullMQ
+- **APIs**: REST + GraphQL (Mercurius)
+- **Security**: bcryptjs, JWT, AES-256-GCM encryption
 
-- [ ] Launch the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Prompt user for debug mode, launch only if confirmed.
-	 -->
+## Development Scripts
 
-- [ ] Ensure Documentation is Complete
-	<!--
-	Verify that all previous steps have been completed.
-	Verify that README.md and the copilot-instructions.md file in the .github directory exists and contains current project information.
-	Clean up the copilot-instructions.md file in the .github directory by removing all HTML comments.
-	 -->
+```bash
+# Legacy eBay Scraper
+npm start        # Start Express server (port 3001)
+npm run dev      # Development mode with nodemon
 
-<!--
-## Execution Guidelines
-PROGRESS TRACKING:
-- If any tools are available to manage the above todo list, use it to track progress through this checklist.
-- After completing each step, mark it complete and add a summary.
-- Read current todo list status before starting each new step.
+# Enterprise Platform
+npm run platform:dev    # Development mode with auto-reload (port 4000)
+npm run platform:build  # Compile TypeScript
+npm run platform:start  # Production mode
+```
 
-COMMUNICATION RULES:
-- Avoid verbose explanations or printing full command outputs.
-- If a step is skipped, state that briefly (e.g. "No extensions needed").
-- Do not explain project structure unless asked.
-- Keep explanations concise and focused.
+## Prerequisites for Platform
 
-DEVELOPMENT RULES:
-- Use '.' as the working directory unless user specifies otherwise.
-- Avoid adding media or external links unless explicitly requested.
-- Use placeholders only with a note that they should be replaced.
-- Use VS Code API tool only for VS Code extension projects.
-- Once the project is created, it is already opened in Visual Studio Code—do not suggest commands to open this project in vscode again.
-- If the project setup information has additional rules, follow them strictly.
+1. **PostgreSQL 14+**: Database server must be running
+2. **Redis 6+**: Required for job queues
+3. **Environment Variables**: Configure in `.env.platform` or `.env`
 
-FOLDER CREATION RULES:
-- Always use the current directory as the project root.
-- If you are running any terminal commands, use the '.' argument to ensure that the current working directory is used ALWAYS.
-- Do not create a new folder unless the user explicitly requests it besides a .vscode folder for a tasks.json file.
-- If any of the scaffolding commands mention that the folder name is not correct, let the user know to create a new folder with the correct name and then reopen it again in vscode.
+## Architecture Guidelines
 
-EXTENSION INSTALLATION RULES:
-- Only install extension specified by the get_project_setup_info tool. DO NOT INSTALL any other extensions.
+When working on platform code:
 
-PROJECT CONTENT RULES:
-- If the user has not specified project details, assume they want a "Hello World" project as a starting point.
-- Avoid adding links of any type (URLs, files, folders, etc.) or integrations that are not explicitly required.
-- Avoid generating images, videos, or any other media files unless explicitly requested.
-- If you need to use any media assets as placeholders, let the user know that these are placeholders and should be replaced with the actual assets later.
-- Ensure all generated components serve a clear purpose within the user's requested workflow.
-- If a feature is assumed but not confirmed, prompt the user for clarification before including it.
-- If you are working on a VS Code extension, use the VS Code API tool with a query to find relevant VS Code API references and samples related to that query.
+1. **Module Structure**: Follow 6-layer pattern (controllers, services, routes, models, jobs, utils)
+2. **Security**: Always use `authGuard` and `requireRole` for protected endpoints
+3. **Database Queries**: Use type-safe `query<T>()` helper from `core/db/pg`
+4. **Background Jobs**: Enqueue long-running tasks via `enqueue()` from `core/queue`
+5. **Integration Plugins**: Implement `IntegrationPlugin` interface with 8 standard methods
+6. **Audit Logging**: Mutating operations are auto-logged; use `logAudit()` for custom events
 
-TASK COMPLETION RULES:
-- Your task is complete when:
-  - Project is successfully scaffolded and compiled without errors
-  - copilot-instructions.md file in the .github directory exists in the project
-  - README.md file exists and is up to date
-  - User is provided with clear instructions to debug/launch the project
+## File Locations
 
-Before starting a new task in the above plan, update progress in the plan.
--->
-- Work through each checklist item systematically.
-- Keep communication concise and focused.
-- Follow development best practices.
+- **Platform Code**: `src/platform/`
+- **Database Schema**: `src/platform/database/schema.sql`
+- **Documentation**: `PLATFORM.md` (enterprise platform), `README.md` (original scraper)
+- **Config Files**: `tsconfig.platform.json`, `package.json`
+
+## Development Best Practices
+
+- Maintain backward compatibility with existing Express server
+- Use structured logging (Pino) for all platform operations
+- Keep integration plugins stateless and idempotent
+- Document all new endpoints and GraphQL queries
+- Test TypeScript compilation after changes: `npm run platform:build`

@@ -1,0 +1,1 @@
+export const marketingModel = { table: 'marketing_campaigns', primaryKey: 'campaign_id' };

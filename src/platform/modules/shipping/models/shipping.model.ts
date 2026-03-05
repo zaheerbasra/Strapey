@@ -1,0 +1,1 @@
+export const shippingModel = { supports: ['CanadaPost', 'USPS', 'UPS', 'FedEx', 'ShipStation', 'EasyPost'] };

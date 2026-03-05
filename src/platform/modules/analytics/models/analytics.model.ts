@@ -1,0 +1,1 @@
+export const analyticsModel = { sourceTables: ['products', 'orders', 'marketing_campaigns'] };
