@@ -381,11 +381,14 @@ async function publishToEbay(productData, overrides = {}) {
     }
 
     const sku = buildPublishSku(productData);
-    const quantity = parseQuantity(productData.availableQuantity);
+    // Always use 3 units for inventory, regardless of available quantity on source
+    const quantity = 3;
     const currency = productData.currency || 'USD';
     const price = typeof productData.price === 'number' ? productData.price : Number(productData.price);
+    // Load or set default backorder/overselling flag
+    const enableBackorder = productData.enableBackorder !== undefined ? productData.enableBackorder : true;
 
-    logger.debug('Product data extracted', { sku, quantity, currency, price });
+    logger.debug('Product data extracted', { sku, quantity: '3 units', currency, price, enableBackorder });
 
     if (!Number.isFinite(price) || price <= 0) {
       const errorMsg = `Invalid price: ${productData.price}`;
@@ -421,6 +424,30 @@ async function publishToEbay(productData, overrides = {}) {
       if (dataChanged) {
         logger.info(`Data changed detected. Updating...`, { priceChanged, quantityChanged });
         
+        // Build aspects with defaults for common missing fields
+        const aspects = Object.fromEntries(
+          Object.entries(productData.itemSpecifics || {}).map(([key, value]) => [
+            key, 
+            [String(value).substring(0, 65)]
+          ])
+        );
+        
+        // Add default values for commonly required fields in collectible categories
+        const defaultAspects = {
+          'Size Type': 'Large',
+          'Size': 'One Size',
+          'Color': 'Silver',
+          'Blade Material': 'Steel',
+          'Type': 'Knife',
+          'Department': 'Unisex'
+        };
+        
+        Object.entries(defaultAspects).forEach(([key, value]) => {
+          if (!aspects[key]) {
+            aspects[key] = [value];
+          }
+        });
+        
         // Update inventory item
         const inventoryPayload = {
           condition: 'NEW',
@@ -433,9 +460,7 @@ async function publishToEbay(productData, overrides = {}) {
             title: String(productData.title || '').substring(0, 80),
             description: String(productData.description || '').substring(0, 4000),
             imageUrls,
-            aspects: Object.fromEntries(
-              Object.entries(productData.itemSpecifics || {}).map(([key, value]) => [key, [String(value)]])
-            )
+            aspects
           }
         };
 
@@ -498,6 +523,30 @@ async function publishToEbay(productData, overrides = {}) {
     // LISTING DOES NOT EXIST - CREATE NEW ONE
     logger.info(`No existing offer found. Creating new listing for SKU: ${sku}`);
 
+    // Build aspects with defaults for common missing fields
+    const aspects = Object.fromEntries(
+      Object.entries(productData.itemSpecifics || {}).map(([key, value]) => [
+        key, 
+        [String(value).substring(0, 65)]
+      ])
+    );
+    
+    // Add default values for commonly required fields in collectible categories
+    const defaultAspects = {
+      'Size Type': 'Large',
+      'Size': 'One Size',
+      'Color': 'Silver',
+      'Blade Material': 'Steel',
+      'Type': 'Knife',
+      'Department': 'Unisex'
+    };
+    
+    Object.entries(defaultAspects).forEach(([key, value]) => {
+      if (!aspects[key]) {
+        aspects[key] = [value];
+      }
+    });
+
     const inventoryPayload = {
       condition: 'NEW',
       availability: {
@@ -509,13 +558,12 @@ async function publishToEbay(productData, overrides = {}) {
         title: String(productData.title || '').substring(0, 80),
         description: String(productData.description || '').substring(0, 4000),
         imageUrls,
-        aspects: Object.fromEntries(
-          Object.entries(productData.itemSpecifics || {}).map(([key, value]) => [key, [String(value)]])
-        )
+        aspects
       }
     };
 
-    logger.debug('Creating inventory item', { sku });
+    logger.debug('Creating inventory item', { sku, hasLocation: !!inventoryPayload.location, locationKey: merchantLocationKey });
+    logger.debug('Full inventory payload for debugging', { payload: JSON.stringify(inventoryPayload) });
 
     await axios.put(`${apiBase}/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, inventoryPayload, {
       headers: {
@@ -551,22 +599,40 @@ async function publishToEbay(productData, overrides = {}) {
 
     logger.debug('Creating offer', { categoryId, marketplaceId, quantity, price });
 
-    const offerResponse = await axios.post(`${apiBase}/sell/inventory/v1/offer`, offerPayload, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Content-Language': 'en-US'
-      },
-      timeout: 30000
-    });
+    let offerId;
+    try {
+      const offerResponse = await axios.post(`${apiBase}/sell/inventory/v1/offer`, offerPayload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Content-Language': 'en-US'
+        },
+        timeout: 30000
+      });
 
-    const offerId = offerResponse.data.offerId;
-    if (!offerId) {
-      logger.error('eBay offer creation did not return offerId', { responseData: offerResponse.data });
-      throw new Error('eBay offer creation did not return offerId.');
+      offerId = offerResponse.data.offerId;
+      if (!offerId) {
+        logger.error('eBay offer creation did not return offerId', { responseData: offerResponse.data });
+        throw new Error('eBay offer creation did not return offerId.');
+      }
+
+      logger.success(`Offer created: ${offerId}`);
+    } catch (offerError) {
+      // If offer already exists, extract the offerId from the error and continue
+      if (offerError.response?.data?.errors?.[0]?.errorId === 25002 && 
+          offerError.response?.data?.errors?.[0]?.message?.includes('already exists')) {
+        
+        const errorParams = offerError.response.data.errors[0].parameters;
+        if (errorParams && errorParams[0]?.value) {
+          offerId = errorParams[0].value;
+          logger.info(`Offer already exists with ID: ${offerId}, will use existing offer`);
+        } else {
+          throw offerError;
+        }
+      } else {
+        throw offerError;
+      }
     }
-
-    logger.success(`Offer created: ${offerId}`);
 
     logger.info(`Publishing offer: ${offerId}`);
 
@@ -582,7 +648,7 @@ async function publishToEbay(productData, overrides = {}) {
     const listingId = publishResponse.data?.listingId || null;
     const listingLink = listingId ? `${sandboxListingUrl}/itm/${listingId}` : null;
 
-    logger.success(`Listing published successfully`, { listingId, listingLink });
+    logger.success(`Listing published successfully`, { listingId, listingLink, quantity, enableBackorder });
 
     return {
       offerId,
@@ -591,12 +657,15 @@ async function publishToEbay(productData, overrides = {}) {
       listingLink,
       status: 'PUBLISHED',
       action: 'CREATED',
-      message: `New listing created and published with SKU: ${sku}`,
+      message: `New listing created and published with SKU: ${sku} (${quantity} units, backorder: ${enableBackorder})`,
+      quantity,
+      enableBackorder,
       logs: logger.getLogs()
     };
   } catch (error) {
-    const logger = createLogger('PublishToEbay-ErrorHandler');
     logger.error('Publish operation failed', error);
+    // Attach logs to error so they can be accessed in the endpoint error handler
+    error._publisherLogs = logger.getLogs();
     throw error;
   }
 }
@@ -1283,6 +1352,109 @@ app.post('/api/ebay-init-policies', async (req, res) => {
       success: false,
       error: 'Failed to initialize business policies',
       details: error.response?.data || error.message
+    });
+  }
+});
+
+// Create a warehouse/location for inventory management
+app.post('/api/ebay-create-warehouse', async (req, res) => {
+  try {
+    const clientId = process.env.EBAY_CLIENT_ID;
+    const clientSecret = process.env.EBAY_CLIENT_SECRET;
+    const refreshToken = process.env.EBAY_REFRESH_TOKEN;
+
+    if (!clientId || !clientSecret || !refreshToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'eBay credentials not fully configured',
+        missingConfig: {
+          hasClientId: !!clientId,
+          hasClientSecret: !!clientSecret,
+          hasRefreshToken: !!refreshToken
+        }
+      });
+    }
+
+    const {
+      warehouseName = 'Main Warehouse',
+      city = 'San Jose',
+      stateOrProvince = 'CA',
+      country = 'US',
+      merchantLocationKey = 'default'
+    } = req.body;
+
+    // Get OAuth token
+    const { identityBase } = getEbayBaseUrls();
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+
+    console.log('[Warehouse Creation] Getting OAuth token...');
+    const tokenResponse = await axios.post(
+      `${identityBase}/identity/v1/oauth2/token`,
+      new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      }).toString(),
+      {
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
+    );
+
+    const token = tokenResponse.data.access_token;
+    console.log('[Warehouse Creation] OAuth token received');
+
+    // Create warehouse
+    const { apiBase } = getEbayBaseUrls();
+    const warehousePayload = {
+      location: {
+        address: {
+          city,
+          stateOrProvince,
+          country
+        }
+      },
+      name: warehouseName,
+      merchantLocationStatus: 'ENABLED',
+      locationTypes: ['WAREHOUSE']
+    };
+
+    console.log('[Warehouse Creation] Creating warehouse with key:', merchantLocationKey);
+    const warehouseResponse = await axios.post(
+      `${apiBase}/sell/inventory/v1/location/${encodeURIComponent(merchantLocationKey)}`,
+      warehousePayload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('[Warehouse Creation] Warehouse created successfully');
+
+    // Store location key in environment variable (for next run, update in .env file manually)
+    process.env.EBAY_LOCATION_KEY = merchantLocationKey;
+
+    return res.json({
+      success: true,
+      message: `Warehouse '${warehouseName}' created successfully`,
+      locationKey: merchantLocationKey,
+      details: {
+        name: warehouseName,
+        address: { city, stateOrProvince, country },
+        status: 'ENABLED',
+        note: `Update your .env file with: EBAY_LOCATION_KEY=${merchantLocationKey}`
+      }
+    });
+  } catch (error) {
+    console.error('[Warehouse Creation] Error:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to create warehouse',
+      message: error.message,
+      ebayError: error.response?.data || null
     });
   }
 });
@@ -2031,9 +2203,12 @@ app.post('/publish-ebay', async (req, res) => {
     productData.offerId = publishResult.offerId;
     productData.publishAction = publishResult.action || 'CREATED';  // Track action: CREATED, UPDATED, or UNCHANGED
     productData.publishedDate = new Date().toISOString();
+    // Store inventory settings for future use
+    productData.inventoryQuantity = publishResult.quantity || 3;
+    productData.enableBackorder = publishResult.enableBackorder !== undefined ? publishResult.enableBackorder : true;
     fs.writeJsonSync(dataFile, allData);
     
-    logger.info('Data saved to data.json');
+    logger.info('Data saved to data.json', { sku: publishResult.sku, inventory: productData.inventoryQuantity, backorder: productData.enableBackorder });
     
     const actionMessages = {
       'CREATED': '✅ New listing created and published',
@@ -2054,13 +2229,19 @@ app.post('/publish-ebay', async (req, res) => {
   } catch (error) {
     logger.error('Publish endpoint error', error);
     
+    // Combine logs from publishToEbay (if available) with endpoint logs
+    let combinedLogs = logger.getLogs();
+    if (error._publisherLogs && Array.isArray(error._publisherLogs)) {
+      combinedLogs = [...error._publisherLogs, ...combinedLogs];
+    }
+    
     const errorResponse = {
       success: false,
       error: error.message,
       code: error.code || 'PUBLISH_ERROR',
       status: error.response?.status || 500,
       timestamp: new Date().toISOString(),
-      logs: logger.getLogs()
+      logs: combinedLogs
     };
 
     // Add eBay API error details if available
@@ -2660,6 +2841,85 @@ async function processAndReplaceImage(originalImagePath) {
     throw error;
   }
 }
+
+// Update inventory settings for a product
+app.post('/api/update-inventory-settings', (req, res) => {
+  try {
+    const { link, inventoryQuantity, enableBackorder } = req.body;
+    
+    if (!link) {
+      return res.status(400).json({ error: 'link is required' });
+    }
+
+    const dataFile = path.join('data', 'data.json');
+    if (!fs.existsSync(dataFile)) {
+      return res.status(404).json({ error: 'Data store not found' });
+    }
+
+    const allData = fs.readJsonSync(dataFile);
+    const productData = allData[link];
+    
+    if (!productData) {
+      return res.status(404).json({ error: 'Product not found in data store' });
+    }
+
+    // Update settings with defaults if not provided
+    if (inventoryQuantity !== undefined && Number.isInteger(inventoryQuantity) && inventoryQuantity > 0) {
+      productData.inventoryQuantity = inventoryQuantity;
+    }
+    
+    if (enableBackorder !== undefined) {
+      productData.enableBackorder = Boolean(enableBackorder);
+    }
+
+    fs.writeJsonSync(dataFile, allData);
+
+    return res.json({
+      success: true,
+      message: 'Inventory settings updated',
+      settings: {
+        link,
+        inventoryQuantity: productData.inventoryQuantity || 3,
+        enableBackorder: productData.enableBackorder !== undefined ? productData.enableBackorder : true
+      }
+    });
+  } catch (error) {
+    console.error('Error updating inventory settings:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Get inventory settings for all products
+app.get('/api/inventory-settings', (req, res) => {
+  try {
+    const dataFile = path.join('data', 'data.json');
+    if (!fs.existsSync(dataFile)) {
+      return res.status(404).json({ error: 'Data store not found' });
+    }
+
+    const allData = fs.readJsonSync(dataFile);
+    const settings = {};
+
+    for (const [link, productData] of Object.entries(allData)) {
+      settings[link] = {
+        sku: productData.customLabel || 'N/A',
+        title: productData.title ? productData.title.substring(0, 50) : 'N/A',
+        inventoryQuantity: productData.inventoryQuantity || 3,
+        enableBackorder: productData.enableBackorder !== undefined ? productData.enableBackorder : true,
+        publishedLink: productData.publishedLink || null
+      };
+    }
+
+    return res.json({
+      success: true,
+      total: Object.keys(settings).length,
+      settings
+    });
+  } catch (error) {
+    console.error('Error retrieving inventory settings:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
