@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eBay Scraper</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --bg-alt: #0b1220;
+      --accent: #6366f1;
+      --accent-soft: rgba(99, 102, 241, 0.14);
+      --accent-strong: rgba(129, 140, 248, 0.5);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border-subtle: #1f2937;
+      --error-bg: rgba(127, 29, 29, 0.4);
+      --error-border: #f97373;
+      --error-text: #fecaca;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(129, 140, 248, 0.35), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.3), transparent 55%),
+        radial-gradient(circle at top right, rgba(56, 189, 248, 0.2), transparent 60%),
+        linear-gradient(135deg, #020617, #020617 40%, #020617);
+      color: var(--text);
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 1000px;
+      background: radial-gradient(circle at top left, rgba(248, 250, 252, 0.06), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(52, 211, 153, 0.08), transparent 55%),
+        rgba(15, 23, 42, 0.94);
+      border-radius: 22px;
+      padding: 24px 26px 22px;
+      box-shadow:
+        0 22px 60px rgba(15, 23, 42, 0.8),
+        0 0 0 1px rgba(148, 163, 184, 0.12),
+        0 0 0 1px rgba(15, 23, 42, 0.9) inset;
+      backdrop-filter: blur(28px) saturate(160%);
+      border: 1px solid rgba(15, 23, 42, 0.95);
+    }
+
+    header {
+      margin-bottom: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.9rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.35rem;
+    }
+
+    .subtitle {
+      font-size: 0.93rem;
+      color: var(--muted);
+      max-width: 640px;
+    }
+
+    .subtitle span {
+      color: rgba(196, 181, 253, 0.95);
+      font-weight: 500;
+    }
+
+    form {
+      margin-bottom: 1.2rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.45rem;
+    }
+
+    .textarea-wrapper {
+      position: relative;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      border-radius: 0.9rem;
+      padding: 0.85rem 0.95rem;
+      border: 1px solid #111827;
+      background: rgba(2, 6, 23, 0.96);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.85rem;
+      resize: vertical;
+      box-shadow:
+        0 1px 0 rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(15, 23, 42, 0.8) inset;
+    }
+
+    textarea::placeholder {
+      color: rgba(148, 163, 184, 0.75);
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: rgba(129, 140, 248, 0.95);
+      box-shadow:
+        0 0 0 1px rgba(129, 140, 248, 0.85),
+        0 0 0 1px rgba(15, 23, 42, 1) inset;
+    }
+
+    .textarea-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+
+    .form-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.7rem;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+    }
+
+    .hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+      max-width: 65%;
+    }
+
+    .hint strong {
+      color: #c4b5fd;
+      font-weight: 500;
+    }
+
+    button[type="submit"] {
+      border: none;
+      outline: none;
+      cursor: pointer;
+      border-radius: 999px;
+      padding: 0.6rem 1.4rem;
+      font-size: 0.86rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #f9fafb;
+      background-image:
+        radial-gradient(circle at 0% 0%, rgba(244, 244, 245, 0.22), transparent 50%),
+        radial-gradient(circle at 100% 0%, rgba(196, 181, 253, 0.55), transparent 64%),
+        linear-gradient(135deg, #4f46e5, #6366f1, #22c55e);
+      box-shadow:
+        0 12px 35px rgba(55, 65, 81, 0.72),
+        0 0 0 1px rgba(15, 23, 42, 0.8),
+        0 0 0 1px rgba(148, 163, 184, 0.2) inset;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      white-space: nowrap;
+    }
+
+    button[type="submit"]:hover:not(:disabled) {
+      filter: brightness(1.02);
+      box-shadow:
+        0 14px 40px rgba(55, 65, 81, 0.82),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+      transform: translateY(-0.5px);
+    }
+
+    button[type="submit"]:active:not(:disabled) {
+      transform: translateY(0.5px);
+      box-shadow:
+        0 10px 32px rgba(15, 23, 42, 0.85),
+        0 0 0 1px rgba(15, 23, 42, 1);
+    }
+
+    button[type="submit"]:disabled {
+      opacity: 0.7;
+      cursor: wait;
+      box-shadow:
+        0 6px 18px rgba(15, 23, 42, 0.7),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(248, 250, 252, 0.24);
+      border-top-color: #f9fafb;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .results {
+      margin-top: 1.4rem;
+      padding-top: 1.1rem;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.7rem;
+      gap: 0.6rem;
+    }
+
+    .results-title {
+      font-size: 0.98rem;
+      font-weight: 600;
+    }
+
+    .pill {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(30, 64, 175, 0.5);
+      color: #bfdbfe;
+      border: 1px solid rgba(59, 130, 246, 0.7);
+    }
+
+    /* eBay-style listing layout */
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .listing-card {
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    .listing-top {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+      align-items: start;
+    }
+
+    .listing-top-no-gallery {
+      grid-template-columns: 1fr;
+    }
+
+    @media (max-width: 720px) {
+      .listing-top {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+      }
+    }
+
+    .listing-gallery {
+      position: sticky;
+      top: 1rem;
+    }
+
+    .listing-main-img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      background: #f7f7f7;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+    }
+
+    .listing-thumbs {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .listing-thumb {
+      width: 56px;
+      height: 56px;
+      object-fit: cover;
+      border: 1px solid #e5e5e5;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #f7f7f7;
+      flex-shrink: 0;
+    }
+
+    .listing-thumb:hover,
+    .listing-thumb.active {
+      border-color: #3665f3;
+      box-shadow: 0 0 0 2px rgba(54, 101, 243, 0.3);
+    }
+
+    .listing-details {
+      min-width: 0;
+    }
+
+    .listing-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #333;
+      margin: 0 0 0.5rem 0;
+      word-wrap: break-word;
+    }
+
+    .listing-price {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .listing-format {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      margin-bottom: 0.5rem;
+    }
+
+    .listing-format.buy-it-now {
+      background: #3665f3;
+      color: #fff;
+    }
+
+    .listing-format.auction {
+      background: #e53238;
+      color: #fff;
+    }
+
+    .listing-meta-line {
+      font-size: 0.8rem;
+      color: #555;
+      margin-bottom: 0.25rem;
+    }
+
+    .listing-meta-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .listing-qty {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 0.75rem;
+    }
+
+    .listing-link {
+      display: inline-block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #3665f3;
+      text-decoration: none;
+    }
+
+    .listing-link:hover {
+      text-decoration: underline;
+    }
+
+    .listing-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .publish-btn {
+      border: 1px solid #2563eb;
+      background: #1d4ed8;
+      color: #fff;
+      border-radius: 999px;
+      padding: 0.42rem 0.85rem;
+      font-size: 0.78rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .publish-btn:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .publish-status {
+      font-size: 0.75rem;
+      margin-top: 0.4rem;
+      color: #475569;
+    }
+
+    .publish-status.success {
+      color: #047857;
+    }
+
+    .publish-status.error {
+      color: #b91c1c;
+    }
+
+    .published-link {
+      color: #0891b2;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      background-color: rgba(6, 182, 212, 0.1);
+      display: inline-block;
+      transition: all 0.2s ease;
+    }
+
+    .published-link:hover {
+      background-color: rgba(6, 182, 212, 0.2);
+      text-decoration: underline;
+    }
+
+    .listing-section {
+      padding: 0 1.5rem 1.25rem;
+    }
+
+    @media (max-width: 720px) {
+      .listing-section { padding: 0 1rem 1rem; }
+    }
+
+    .listing-section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #333;
+      margin: 0 0 0.5rem 0;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .listing-specifics {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .listing-specifics th,
+    .listing-specifics td {
+      padding: 0.4rem 0.75rem 0.4rem 0;
+      text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+
+    .listing-specifics th {
+      color: #666;
+      font-weight: 400;
+      width: 35%;
+    }
+
+    .listing-specifics td {
+      color: #333;
+    }
+
+    .listing-description {
+      font-size: 0.9rem;
+      line-height: 1.55;
+      color: #333;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .listing-error {
+      background: #fff5f5;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 0.75rem 1rem;
+      margin: 1rem 1.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+
+    .empty-state {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .error {
+      border-left: 3px solid var(--error-border);
+      background: var(--error-bg);
+      color: var(--error-text);
+      padding: 0.55rem 0.7rem;
+      border-radius: 0.75rem;
+      font-size: 0.78rem;
+      margin-top: 0.55rem;
+    }
+
+    .error strong {
+      font-weight: 600;
+    }
+
+    .results-global-error {
+      margin-top: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--error-text);
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        padding: 20px 16px 18px;
+        border-radius: 18px;
+      }
+
+      header {
+        margin-bottom: 1.2rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .subtitle {
+        font-size: 0.86rem;
+      }
+
+      .form-footer {
+        align-items: flex-start;
+      }
+
+      .hint {
+        max-width: 100%;
+        order: 2;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header>
+      <h1>eBay Product Scraper</h1>
+      <p class="subtitle">
+        Paste one or more eBay listing URLs and we’ll fetch clean product data and
+        <span>enhanced, high‑quality images</span> for you.
+      </p>
+    </header>
+    <!-- eBay API Credentials Validation -->
+    <div class="credentials-section" style="margin-bottom: 1.5rem; padding: 1rem; background: rgba(2, 6, 23, 0.5); border-radius: 0.9rem; border: 1px solid #111827;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+        <div>
+          <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.25rem;">eBay API Status</div>
+          <div id="credentialsStatus" style="font-size: 0.78rem; color: var(--muted);">
+            Click to validate your eBay API credentials
+          </div>
+        </div>
+        <button type="button" id="validateBtn" onclick="validateCredentials()" style="border: none; outline: none; cursor: pointer; border-radius: 999px; padding: 0.5rem 1.2rem; font-size: 0.82rem; font-weight: 600; color: #f9fafb; background: linear-gradient(135deg, #3b82f6, #6366f1); box-shadow: 0 4px 12px rgba(55, 65, 81, 0.6), 0 0 0 1px rgba(15, 23, 42, 0.8); white-space: nowrap;">
+          <span id="validateSpinner" style="display: none; width: 12px; height: 12px; border-radius: 999px; border: 2px solid rgba(248, 250, 252, 0.24); border-top-color: #f9fafb; animation: spinner 0.6s linear infinite; display: inline-block; vertical-align: middle; margin-right: 0.4rem;"></span>
+          <span id="validateBtnText">Validate Credentials</span>
+        </button>
+      </div>
+    </div>
+    <form id="scrapeForm">
+      <label for="itemsInput">Item number, Link, Custom label (SKU)</label>
+      <div class="textarea-wrapper">
+        <textarea
+          id="itemsInput"
+          name="items"
+          rows="10"
+          placeholder="304569312160&#9;https://www.ebay.com/itm/304569312160&#9;USL
+302710852493&#9;https://www.ebay.com/itm/302710852493&#9;RD-Bar
+304053796929&#9;https://www.ebay.com/itm/304053796929&#9;LD-Bar"
+        ></textarea>
+        <p class="textarea-hint">One row per listing. Separate with <strong>tab</strong> or comma: <strong>Item number</strong>&#9;<strong>Link</strong>&#9;<strong>SKU</strong>. The SKU is your unique identifier stored in data.json.</p>
+      </div>
+
+      <div class="form-footer">
+        <p class="hint">
+          <strong>Data:</strong> New links are inserted; existing links are updated only when price, title, or description changes. No duplicates — data.json is the single source for all runs.
+        </p>
+        <button type="submit" id="submitBtn">
+          <span class="spinner" id="spinner" style="display: none;"></span>
+          <span id="buttonText">Scrape listings</span>
+        </button>
+      </div>
+    </form>
+
+    <section class="results" id="resultsSection" style="display: none;">
+      <div class="results-header">
+        <div class="results-title">Results</div>
+        <span class="pill" id="resultCount"></span>
+      </div>
+      <div id="results" class="grid"></div>
+      <div id="resultsError" class="results-global-error"></div>
+    </section>
+  </div>
+
+  <script>
+    const form = document.getElementById('scrapeForm');
+    const itemsInput = document.getElementById('itemsInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('spinner');
+    const buttonText = document.getElementById('buttonText');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsContainer = document.getElementById('results');
+    const resultCount = document.getElementById('resultCount');
+    const resultsError = document.getElementById('resultsError');
+
+    function setLoading(isLoading) {
+      if (isLoading) {
+        submitBtn.disabled = true;
+        spinner.style.display = 'inline-block';
+        buttonText.textContent = 'Scraping…';
+      } else {
+        submitBtn.disabled = false;
+        spinner.style.display = 'none';
+        buttonText.textContent = 'Scrape listings';
+      }
+    }
+
+    function toCurrency(value, currency) {
+      if (typeof value !== 'number' || Number.isNaN(value)) return 'N/A';
+      try {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: currency || 'USD',
+          maximumFractionDigits: 2
+        }).format(value);
+      } catch {
+        return `$${value.toFixed(2)}`;
+      }
+    }
+
+    function safeImageUrl(path) {
+      if (!path) return null;
+      const normalized = String(path).replace(/^[./]*/, '').replace(/\\\\/g, '/').replace(/\\/g, '/');
+      return '/' + normalized;
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const s = String(str);
+      return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderResults(data) {
+      resultsError.textContent = '';
+
+      if (!Array.isArray(data) || data.length === 0) {
+        resultsSection.style.display = 'block';
+        resultCount.textContent = '0 listings';
+        resultsContainer.innerHTML = '<p class="empty-state">No results yet — try pasting a few eBay URLs above.</p>';
+        return;
+      }
+
+      resultsSection.style.display = 'block';
+      resultCount.textContent = data.length === 1 ? '1 listing' : data.length + ' listings';
+
+      const cards = data.map((item, index) => {
+        const hasError = !!item.error;
+        const title = escapeHtml(item.title || 'Untitled listing');
+        const url = item.url || '';
+        const price = item.price;
+        const currency = item.currency || 'USD';
+        const description = escapeHtml(item.description || '');
+        const imagesEnhanced = Array.isArray(item.images) ? item.images : [];
+        const imagesOriginal = Array.isArray(item.imagesOriginal) ? item.imagesOriginal : [];
+        const itemSpecifics = item.itemSpecifics && typeof item.itemSpecifics === 'object' ? item.itemSpecifics : {};
+        const availableQuantity = item.availableQuantity || '';
+        const format = (item.format || '').toLowerCase();
+        const itemNumber = item.itemNumber || '';
+        const skuLabel = item.customLabel || '';
+        const isAuction = format.includes('auction');
+
+        const enhancedUrls = imagesEnhanced.map(safeImageUrl).filter(Boolean);
+        const originalUrls = imagesOriginal.map(safeImageUrl).filter(Boolean);
+        const allThumbs = enhancedUrls.length ? enhancedUrls : originalUrls;
+        const mainImgUrl = allThumbs[0] || originalUrls[0] || '';
+        const hasImages = mainImgUrl.length > 0;
+
+        const priceText = typeof price === 'number' ? toCurrency(price, currency) : 'N/A';
+        const formatClass = isAuction ? 'auction' : 'buy-it-now';
+        const formatLabel = item.format || (isAuction ? 'Auction' : 'Buy It Now');
+        const specificsRows = Object.entries(itemSpecifics).map(([k, v]) =>
+          `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`
+        ).join('');
+
+        const galleryHtml = hasImages ? `
+              <div class="listing-gallery">
+                <img class="listing-main-img" src="${mainImgUrl}" alt="${title}" data-listing-index="${index}">
+                <div class="listing-thumbs" data-listing-index="${index}">
+                  ${allThumbs.map((src, i) => `<img class="listing-thumb ${i === 0 ? 'active' : ''}" src="${src}" alt="" data-src="${src}">`).join('')}
+                </div>
+              </div>
+            ` : '';
+
+        return `
+          <article class="listing-card" data-index="${index}">
+            ${hasError ? `<div class="listing-error"><strong>Scrape issue:</strong> ${escapeHtml(item.error)}</div>` : ''}
+            <div class="listing-top ${hasImages ? '' : 'listing-top-no-gallery'}">
+              ${galleryHtml}
+              <div class="listing-details">
+                <h1 class="listing-title">${title}</h1>
+                ${itemNumber ? `<div class="listing-meta-line"><span class="listing-meta-label">Item #</span> ${escapeHtml(itemNumber)}</div>` : ''}
+                ${skuLabel ? `<div class="listing-meta-line"><span class="listing-meta-label">SKU</span> ${escapeHtml(skuLabel)}</div>` : ''}
+                <div class="listing-price">${priceText}</div>
+                ${formatLabel ? `<span class="listing-format ${formatClass}">${escapeHtml(formatLabel)}</span>` : ''}
+                ${availableQuantity ? `<div class="listing-qty">${escapeHtml(availableQuantity)}</div>` : ''}
+                <div class="listing-actions">
+                  ${url ? `<a class="listing-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">View on eBay</a>` : ''}
+                  ${url ? `<button type="button" class="publish-btn" data-link="${escapeHtml(url)}">Publish to eBay</button>` : ''}
+                </div>
+                <div class="publish-status" data-link="${escapeHtml(url)}"></div>
+              </div>
+            </div>
+            ${specificsRows ? `
+              <div class="listing-section">
+                <h2 class="listing-section-title">Item specifics</h2>
+                <table class="listing-specifics"><tbody>${specificsRows}</tbody></table>
+              </div>
+            ` : ''}
+            ${description ? `
+              <div class="listing-section">
+                <h2 class="listing-section-title">Description</h2>
+                <div class="listing-description">${description}</div>
+              </div>
+            ` : ''}
+          </article>
+        `;
+      });
+
+      resultsContainer.innerHTML = cards.join('');
+
+      resultsContainer.querySelectorAll('.listing-thumb').forEach(thumb => {
+        thumb.addEventListener('click', function() {
+          const card = this.closest('.listing-card');
+          const main = card.querySelector('.listing-main-img');
+          const src = this.getAttribute('data-src');
+          if (main && src) {
+            main.src = src;
+            card.querySelectorAll('.listing-thumb').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+          }
+        });
+      });
+
+      resultsContainer.querySelectorAll('.publish-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+          const link = this.getAttribute('data-link') || '';
+          const card = this.closest('.listing-card');
+          const statusEl = card ? card.querySelector('.publish-status') : null;
+          if (!link) return;
+
+          this.disabled = true;
+          if (statusEl) {
+            statusEl.className = 'publish-status';
+            statusEl.textContent = 'Publishing...';
+          }
+
+          try {
+            const response = await fetch('/publish-ebay', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ link })
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              throw new Error(body.error || 'Publish failed');
+            }
+            if (statusEl) {
+              const listingLink = body.listingLink || body.link;
+              const action = body.action || 'CREATED';
+              let actionText = '';
+              
+              if (action === 'CREATED') {
+                actionText = '✅ Created & Published';
+              } else if (action === 'UPDATED') {
+                actionText = '✏️ Updated Listing';
+              } else if (action === 'UNCHANGED') {
+                actionText = 'ℹ️ No Changes';
+              }
+              
+              const linkHtml = listingLink ? 
+                `${actionText} • <a href="${escapeHtml(listingLink)}" target="_blank" class="published-link">View on Sandbox</a>` : 
+                `${actionText}${body.listingId ? ` (ID: ${body.listingId})` : ''}`;
+              statusEl.className = 'publish-status success';
+              statusEl.innerHTML = linkHtml;
+            }
+          } catch (error) {
+            if (statusEl) {
+              statusEl.className = 'publish-status error';
+              statusEl.textContent = error.message || 'Publish failed';
+            }
+          } finally {
+            this.disabled = false;
+          }
+        });
+      });
+    }
+
+    function normalizeLink(input) {
+      const s = (input || '').trim();
+      if (!s) return '';
+      if (/^https?:\/\//i.test(s)) return s;
+      if (/^www\./i.test(s) || /ebay\.com\/itm\//i.test(s)) return 'https://' + s.replace(/^https?:\/\//i, '');
+      return '';
+    }
+
+    function parseItemsInput(text) {
+      return text
+        .split(/\n+/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => {
+          const parts = line.split(/[\t,]+/).map(p => p.trim());
+          let itemNumber = '', link = '', sku = '';
+          if (parts.length >= 2) {
+            itemNumber = parts[0];
+            link = normalizeLink(parts[1]);
+            sku = parts[2] || '';
+          } else if (parts.length === 1) {
+            link = normalizeLink(parts[0]);
+          }
+          return { itemNumber, link, sku };
+        })
+        .filter(item => item.link);
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      resultsError.textContent = '';
+
+      const items = parseItemsInput(itemsInput.value);
+
+      if (!items.length) {
+        alert('Enter at least one row with a Link (e.g. Item number, Link, Custom label).');
+        itemsInput.focus();
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await fetch('/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items })
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
+        if (!response.ok) {
+          let msg = 'Server responded with ' + response.status + ' ' + response.statusText;
+          if (isJson) {
+            const body = await response.json().catch(() => ({}));
+            if (body && body.error) msg = body.error;
+          } else {
+            const text = await response.text();
+            if (text && text.length < 300) msg = text;
+            else if (text) msg = response.status + ': ' + text.substring(0, 200).trim() + (text.length > 200 ? '…' : '');
+          }
+          throw new Error(msg);
+        }
+
+        const data = isJson ? await response.json() : await response.text();
+        if (typeof data !== 'object' || !Array.isArray(data)) throw new Error('Invalid response from server');
+        renderResults(data);
+      } catch (error) {
+        console.error('Scrape request failed:', error);
+        resultsSection.style.display = 'block';
+        resultsContainer.innerHTML = '';
+        resultCount.textContent = '';
+        const msg = error && error.message ? error.message : 'Something went wrong while scraping.';
+        resultsError.textContent = msg + ' Please try again or check the server is running.';
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    // Validate eBay API Credentials
+    async function validateCredentials() {
+      const validateBtn = document.getElementById('validateBtn');
+      const validateSpinner = document.getElementById('validateSpinner');
+      const validateBtnText = document.getElementById('validateBtnText');
+      const credentialsStatus = document.getElementById('credentialsStatus');
+
+      try {
+        validateBtn.disabled = true;
+        validateSpinner.style.display = 'inline-block';
+        validateBtnText.textContent = 'Validating...';
+        credentialsStatus.innerHTML = '<span style="color: var(--muted);">Checking credentials...</span>';
+
+        const response = await fetch('/api/validate-ebay-credentials');
+        const data = await response.json();
+
+        if (data.success) {
+          credentialsStatus.innerHTML = `
+            <span style="color: #34d399;">✓ Credentials validated successfully</span>
+            <span style="color: var(--muted); margin-left: 0.5rem;">(${data.details.environment} environment)</span>
+          `;
+          validateBtnText.textContent = 'Re-validate';
+        } else {
+          credentialsStatus.innerHTML = `
+            <span style="color: #f87171;">✗ ${data.error || 'Validation failed'}</span>
+          `;
+          if (data.details) {
+            console.error('Validation details:', data.details);
+          }
+          validateBtnText.textContent = 'Try Again';
+        }
+      } catch (error) {
+        console.error('Validation error:', error);
+        credentialsStatus.innerHTML = `<span style="color: #f87171;">✗ Failed to connect to server</span>`;
+        validateBtnText.textContent = 'Try Again';
+      } finally {
+        validateBtn.disabled = false;
+        validateSpinner.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

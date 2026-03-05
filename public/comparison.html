@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Processing Comparison</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      color: white;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .subtitle {
+      font-size: 1.1em;
+      opacity: 0.95;
+    }
+
+    .comparison-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .image-card {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease;
+    }
+
+    .image-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .card-title {
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 1.3em;
+      font-weight: 600;
+    }
+
+    .image-wrapper {
+      padding: 20px;
+      background: #f8f9fa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 500px;
+    }
+
+    .image-wrapper img {
+      max-width: 100%;
+      max-height: 500px;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .stats {
+      padding: 20px;
+      background: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 0.95em;
+    }
+
+    .stat-label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .stat-value {
+      color: #666;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+
+    .stats-highlight {
+      background: #e8f4f8;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+
+    .pipeline {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .pipeline h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+    }
+
+    .pipeline-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .step {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      font-size: 0.9em;
+      line-height: 1.6;
+    }
+
+    .step strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 1.1em;
+    }
+
+    .improvements {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+
+    .improvements h2 {
+      color: #667eea;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+    }
+
+    .improvement-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .improvement-item {
+      padding: 15px;
+      background: #f0f4ff;
+      border-left: 4px solid #667eea;
+      border-radius: 6px;
+    }
+
+    .improvement-item strong {
+      color: #667eea;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .comparison-note {
+      text-align: center;
+      color: white;
+      margin-top: 30px;
+      font-size: 0.95em;
+      line-height: 1.6;
+      background: rgba(0,0,0,0.3);
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .comparison-container {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+
+      .pipeline-steps {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🖼️ Image Processing Comparison</h1>
+      <p class="subtitle">Before vs After AI Enhancement & Theme Grading</p>
+    </header>
+
+    <div class="comparison-container">
+      <!-- Original Image -->
+      <div class="image-card">
+        <div class="card-title">📌 Original Image</div>
+        <div class="image-wrapper">
+          <img src="/data/e319307b5967c0968e5a339736edf220/TEST_ORIGINAL.webp" alt="Original">
+        </div>
+        <div class="stats">
+          <div class="stat-row">
+            <span class="stat-label">File Size:</span>
+            <span class="stat-value">116 KB</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dimensions:</span>
+            <span class="stat-value">800 × 800 px</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Format:</span>
+            <span class="stat-value">WebP</span>
+          </div>
+          <div class="stats-highlight">
+            <strong>State:</strong> Downloaded from eBay, minimal processing
+          </div>
+        </div>
+      </div>
+
+      <!-- Enhanced Image -->
+      <div class="image-card">
+        <div class="card-title">✨ Enhanced Image</div>
+        <div class="image-wrapper">
+          <img src="/data/e319307b5967c0968e5a339736edf220/TEST_ENHANCED_final.webp" alt="Enhanced">
+        </div>
+        <div class="stats">
+          <div class="stat-row">
+            <span class="stat-label">File Size:</span>
+            <span class="stat-value">1.1 MB</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dimensions:</span>
+            <span class="stat-value">3600 × 3600 px</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Format:</span>
+            <span class="stat-value">WebP</span>
+          </div>
+          <div class="stats-highlight">
+            <strong>Resolution:</strong> 4.5× larger (450% increase)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Processing Pipeline -->
+    <div class="pipeline">
+      <h2>🔄 Processing Pipeline Applied</h2>
+      <div class="pipeline-steps">
+        <div class="step">
+          <strong>1. Rotate & Resize</strong>
+          Automatic orientation correction and intelligent resizing with Lanczos3 kernel
+        </div>
+        <div class="step">
+          <strong>2. Canvas Extension</strong>
+          Expand to 2400×2400px with consistent light gray background
+        </div>
+        <div class="step">
+          <strong>3. Edge Sharpening</strong>
+          Apply edge enhancement (sigma: 1.5) for crisper product visibility
+        </div>
+        <div class="step">
+          <strong>4. Theme Grading</strong>
+          Consistent color grading: +15% saturation, +5% brightness, +8% contrast
+        </div>
+        <div class="step">
+          <strong>5. Noise Reduction</strong>
+          Median filtering to remove grain and artifacts
+        </div>
+        <div class="step">
+          <strong>6. Auto-Level Adjust</strong>
+          Normalize tonal range for better depth and detail
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Improvements -->
+    <div class="improvements">
+      <h2>🎯 Key Visual Improvements</h2>
+      <div class="improvement-list">
+        <div class="improvement-item">
+          <strong>✓ Higher Resolution</strong>
+          3600×3600px vs 800×800px - 4.5× larger for better e-commerce display
+        </div>
+        <div class="improvement-item">
+          <strong>✓ Consistent Branding</strong>
+          Same theme (saturation, brightness, contrast) applied to all product images
+        </div>
+        <div class="improvement-item">
+          <strong>✓ Professional Background</strong>
+          Clean 2400×2400px canvas with centered product on light gray backdrop
+        </div>
+        <div class="improvement-item">
+          <strong>✓ Sharper Details</strong>
+          Edge enhancement reveals fine details (stitching, texture, surface finish)
+        </div>
+        <div class="improvement-item">
+          <strong>✓ Enhanced Colors</strong>
+          Vibrant saturation (+15%) makes colors pop while staying accurate
+        </div>
+        <div class="improvement-item">
+          <strong>✓ Noise-Free</strong>
+          Median filtering removes compression artifacts and grain
+        </div>
+      </div>
+    </div>
+
+    <div class="comparison-note">
+      <strong>📝 Processing Note:</strong><br>
+      The enhanced image uses Real-ESRGAN AI upscaling via upscayl CLI if available.<br>
+      Currently falling back to Sharp's Lanczos3 resampling for 1.5× upscaling.<br>
+      <br>
+      <strong>To install upscayl for superior AI upscaling:</strong> <code>brew install upscayl</code>
+    </div>
+  </div>
+</body>
+</html>
