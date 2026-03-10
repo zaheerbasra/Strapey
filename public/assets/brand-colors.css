@@ -1,0 +1,165 @@
+/**
+ * Strapey Brand Colors - CSS Variables
+ * Brand: Strapey - Crafted for Wild
+ * Updated: March 2026
+ * 
+ * Usage: Apply these CSS variables to your stylesheets for consistent branding
+ */
+
+:root {
+  /* Primary Brand Colors */
+  --brand-forest-green: #1a4d2e;
+  --brand-forest-green-dark: #0f2919;
+  --brand-charcoal: #2c2c2c;
+  --brand-steel-gray: #6b7280;
+  
+  /* Accent Colors */
+  --brand-burnt-orange: #d97706;
+  --brand-bronze: #92400e;
+  --brand-copper: #b45309;
+  
+  /* Supporting Neutrals */
+  --brand-stone: #808080;
+  --brand-steel: #606060;
+  --brand-light: #f0f0f0;
+  --brand-white: #ffffff;
+  --brand-black: #000000;
+  
+  /* Semantic Color Mapping */
+  --brand-primary: var(--brand-forest-green);
+  --brand-secondary: var(--brand-charcoal);
+  --brand-accent: var(--brand-burnt-orange);
+  --brand-danger: #cc0000;
+  
+  /* Typography */
+  --font-heading: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif;
+  --font-body: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
+  
+  /* Brand Spacing */
+  --brand-letter-spacing-heading: 4px;
+  --brand-letter-spacing-motto: 2px;
+}
+
+/* Example Usage */
+
+.brand-header {
+  background: var(--brand-forest-green);
+  color: var(--brand-white);
+  font-family: var(--font-heading);
+  letter-spacing: var(--brand-letter-spacing-heading);
+}
+
+.brand-cta {
+  background: var(--brand-burnt-orange);
+  color: var(--brand-white);
+  font-family: var(--font-heading);
+}
+
+.brand-text {
+  font-family: var(--font-body);
+  color: var(--brand-charcoal);
+}
+
+.brand-motto {
+  color: var(--brand-burnt-orange);
+  letter-spacing: var(--brand-letter-spacing-motto);
+  text-transform: uppercase;
+}
+
+/* Gradient Backgrounds */
+.hero-gradient {
+  background: linear-gradient(135deg, 
+    var(--brand-forest-green-dark) 0%, 
+    var(--brand-forest-green) 50%, 
+    var(--brand-charcoal) 100%);
+}
+
+.accent-gradient {
+  background: linear-gradient(90deg,
+    var(--brand-burnt-orange) 0%,
+    var(--brand-bronze) 100%);
+}
+
+/* Button Styles */
+.btn-primary {
+  background: var(--brand-burnt-orange);
+  color: var(--brand-white);
+  border: none;
+  padding: 12px 24px;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: var(--brand-bronze);
+}
+
+.btn-secondary {
+  background: var(--brand-charcoal);
+  color: var(--brand-white);
+  border: 2px solid var(--brand-forest-green);
+}
+
+/* Link Styles */
+a.brand-link {
+  color: var(--brand-burnt-orange);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a.brand-link:hover {
+  color: var(--brand-bronze);
+}
+
+/* Card Styles */
+.product-card {
+  background: var(--brand-white);
+  border: 1px solid var(--brand-steel-gray);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.product-card:hover {
+  border-color: var(--brand-forest-green);
+  box-shadow: 0 6px 12px rgba(26, 77, 46, 0.2);
+}
+
+/* Navigation */
+.nav-bar {
+  background: var(--brand-charcoal);
+  border-bottom: 3px solid var(--brand-forest-green);
+}
+
+.nav-link {
+  color: var(--brand-light);
+  font-family: var(--font-heading);
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: var(--brand-burnt-orange);
+}
+
+/* Footer */
+.footer {
+  background: var(--brand-charcoal);
+  color: var(--brand-light);
+  border-top: 3px solid var(--brand-forest-green);
+}
+
+/* Brand Watermark Overlay */
+.watermark {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(26, 77, 46, 0.75);
+  color: var(--brand-white);
+  padding: 8px 16px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 2px;
+  opacity: 0.6;
+}

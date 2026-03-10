@@ -10,7 +10,8 @@
     "app:dev": "nodemon src/app.js",
     "platform:dev": "tsx watch src/platform/main.ts",
     "platform:build": "tsc -p tsconfig.platform.json",
-    "platform:start": "node dist/platform/main.js"
+    "platform:start": "node dist/platform/main.js",
+    "scrape:init-timestamps": "node src/utils/update-scrape-timestamps.js"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

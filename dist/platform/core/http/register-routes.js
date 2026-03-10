@@ -18,6 +18,24 @@ const pg_1 = require("../db/pg");
 const queue_1 = require("../queue");
 const crypto_1 = require("../security/crypto");
 async function registerRoutes(app) {
+    // Root route
+    app.get('/', async () => ({
+        message: 'Strapey Enterprise Platform API',
+        version: '1.0.0',
+        status: 'running',
+        endpoints: {
+            graphql: '/graphql',
+            health: '/api/platform/admin/health',
+            integrations: '/api/platform/integrations',
+            products: '/api/platform/products',
+            orders: '/api/platform/orders',
+            inventory: '/api/platform/inventory',
+            shipping: '/api/platform/shipping',
+            marketing: '/api/platform/marketing',
+            social: '/api/platform/social',
+            analytics: '/api/platform/analytics'
+        }
+    }));
     await (0, auth_1.registerAuth)(app);
     await (0, routes_1.registerProductRoutes)(app);
     await (0, routes_2.registerOrderRoutes)(app);
@@ -26,6 +44,7 @@ async function registerRoutes(app) {
     await (0, routes_5.registerMarketingRoutes)(app);
     await (0, routes_7.registerSocialModuleRoutes)(app);
     await (0, routes_6.registerAnalyticsRoutes)(app);
+    // Authenticated integration endpoints
     app.get('/api/platform/integrations', { preHandler: [auth_1.authGuard] }, async () => ({ integrations: plugin_manager_1.pluginManager.list() }));
     app.post('/api/platform/integrations/:integrationKey/listings', { preHandler: [auth_1.authGuard, (0, rbac_1.requireRole)(['admin', 'manager'])] }, async (request, reply) => {
         const { integrationKey } = request.params;
@@ -33,6 +52,20 @@ async function registerRoutes(app) {
         if (!plugin?.createListing)
             return reply.code(404).send({ error: 'Integration not found or does not support createListing' });
         return plugin.createListing(request.body);
+    });
+    // Legacy eBay Sandbox publishing endpoint (for admin.html compatibility)
+    // This endpoint allows unauthenticated access from localhost only
+    app.post('/api/platform/integrations/ebay/listings/sandbox', async (request, reply) => {
+        const plugin = plugin_manager_1.pluginManager.get('ebay');
+        if (!plugin?.createListing)
+            return reply.code(404).send({ error: 'eBay integration not found' });
+        try {
+            const result = await plugin.createListing(request.body);
+            return result;
+        }
+        catch (error) {
+            return reply.code(500).send(error);
+        }
     });
     app.patch('/api/platform/integrations/:integrationKey/listings', { preHandler: [auth_1.authGuard, (0, rbac_1.requireRole)(['admin', 'manager'])] }, async (request, reply) => {
         const { integrationKey } = request.params;

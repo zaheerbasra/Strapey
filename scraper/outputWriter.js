@@ -45,31 +45,44 @@ class OutputWriter {
   /**
    * Save data to data.json
    * @param {Object} data - Data to save (URL-keyed object)
-   * @param {boolean} merge - Whether to merge with existing data
+   * @param {boolean} merge - DEPRECATED: Always merges to prevent data loss
    */
   save(data, merge = true) {
     try {
-      let outputData = data;
+      // CRITICAL: Always load existing data and merge (never overwrite entire file)
+      const existing = this.loadExisting();
+      const existingCount = Object.keys(existing).length;
+      
+      // Merge new data with existing (upsert only)
+      const outputData = { ...existing, ...data };
+      const newCount = Object.keys(outputData).length;
+      const addedCount = Object.keys(data).length;
 
-      if (merge) {
-        const existing = this.loadExisting();
-        outputData = { ...existing, ...data };
-      }
-
-      // Create backup before overwriting
+      // Create backup before writing
       this.createBackup();
 
-      // Write data
+      // Write merged data
       fs.writeFileSync(
         this.config.output.dataPath,
         JSON.stringify(outputData, null, 4),
         'utf8'
       );
 
-      const itemCount = Object.keys(outputData).length;
-      this.logger.logDataSaved(this.config.output.dataPath, itemCount);
+      // Log with data loss warning
+      if (newCount < existingCount) {
+        this.logger.error('⚠️ WARNING: Product count decreased!', { 
+          before: existingCount, 
+          after: newCount, 
+          loss: existingCount - newCount 
+        });
+      } else {
+        this.logger.logDataSaved(this.config.output.dataPath, newCount);
+        if (addedCount > 0) {
+          this.logger.info(`Added/updated ${addedCount} products. Total: ${newCount}`);
+        }
+      }
 
-      return { success: true, itemCount };
+      return { success: true, itemCount: newCount, existingCount, addedCount };
     } catch (error) {
       this.logger.error('Failed to save data', { error: error.message });
       return { success: false, error: error.message };

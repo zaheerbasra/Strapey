@@ -1,0 +1,175 @@
+{
+  "name": "Strapey",
+  "motto": "Crafted for Wild",
+  "tagline": "Crafted for Wild",
+  "vision": "A rugged premium knife brand inspired by outdoor survival tools and professional kitchen craftsmanship. Built for hunters, adventurers, chefs, and those who value durability, precision, and authentic craftsmanship.",
+  "description": "Strapey delivers high-quality kitchen knives and hunting knives crafted for people who demand durability, outdoor reliability, and professional-grade performance. From wilderness survival to culinary excellence, our blades are forged with the precision and rugged authenticity demanded by serious users.",
+  
+  "brandValues": [
+    "Durability",
+    "Precision Craftsmanship",
+    "Outdoor Reliability",
+    "Professional-Grade Tools",
+    "Rugged Authenticity"
+  ],
+  
+  "targetCustomers": [
+    "Hunters",
+    "Outdoor Survival Enthusiasts",
+    "Campers",
+    "Professional Chefs",
+    "Home Cooks Who Value Quality"
+  ],
+  
+  "colors": {
+    "primary": "#1a4d2e",
+    "primaryName": "Forest Green",
+    "primaryDark": "#0f2919",
+    "secondary": "#2c2c2c",
+    "secondaryName": "Charcoal Black",
+    "tertiary": "#6b7280",
+    "tertiaryName": "Forged Steel Gray",
+    "accent": "#d97706",
+    "accentName": "Burnt Orange",
+    "accentAlt": "#92400e",
+    "accentAltName": "Bronze",
+    "copper": "#b45309",
+    "copperName": "Copper",
+    "stone": "#808080",
+    "steel": "#606060",
+    "danger": "#cc0000",
+    "light": "#f0f0f0",
+    "white": "#ffffff",
+    "black": "#000000"
+  },
+  
+  "fonts": {
+    "primary": "'Bebas Neue', 'Impact', 'Arial Black', sans-serif",
+    "primaryDescription": "Bold rugged font for headings - strong outdoor brand aesthetic",
+    "secondary": "'Roboto Condensed', 'Anton', sans-serif",
+    "body": "'Open Sans', 'Helvetica Neue', Arial, sans-serif",
+    "bodyDescription": "Clean modern readable font for descriptions and body text"
+  },
+  
+  "productCategories": {
+    "hunting-knives": {
+      "name": "Hunting Knives",
+      "tagline": "Forged for the Hunt",
+      "description": "Outdoor hunting and skinning knives built to withstand the toughest wilderness conditions",
+      "keywords": ["hunting", "skinning", "outdoor", "wilderness", "survival", "bushcraft", "game processing", "tactical"]
+    },
+    "kitchen-chef-sets": {
+      "name": "Kitchen & Chef Knives",
+      "tagline": "Precision in Every Slice",
+      "description": "Professional-grade kitchen knives that bring premium craftsmanship to culinary excellence",
+      "keywords": ["chef knife", "kitchen", "culinary", "santoku", "cleaver", "cooking", "gourmet", "professional"]
+    },
+    "pistol-parts": {
+      "name": "Pistol Parts",
+      "tagline": "Crafted Comfort, Tactical Control",
+      "description": "Premium custom grips and pistol parts featuring exotic materials and precise craftsmanship",
+      "keywords": ["1911", "gun grips", "pistol parts", "custom", "pistol", "tactical", "firearm accessories"]
+    }
+  },
+  
+  "brandVoice": {
+    "tone": ["Confident", "Rugged", "Premium", "Adventurous", "Authentic"],
+    "personality": "Rugged yet premium, combining outdoor survival aesthetics with professional culinary craftsmanship",
+    "avoid": ["Cheap", "Mass-produced", "Generic", "Flimsy", "Ordinary", "Gimmicky"],
+    "phrases": [
+      "Crafted for Wild",
+      "Premium handcrafted quality",
+      "Forged steel durability",
+      "Outdoor reliability meets kitchen precision",
+      "Built for serious users",
+      "Tools that perform in the wild and the kitchen",
+      "Rugged craftsmanship, premium performance",
+      "Durable. Reliable. Professional-grade."
+    ]
+  },
+  
+  "seoKeywords": [
+    "premium knife",
+    "hunting knife",
+    "chef knife",
+    "kitchen knife",
+    "outdoor survival knife",
+    "forged steel knife",
+    "professional knife",
+    "durable blade",
+    "bushcraft knife",
+    "tactical knife",
+    "cooking knife",
+    "wilderness tools",
+    "outdoor gear",
+    "quality craftsmanship"
+  ],
+  
+  "socialMedia": {
+    "hashtags": [
+      "#Strapey",
+      "#CraftedForWild",
+      "#HuntingKnife",
+      "#ChefKnife",
+      "#OutdoorGear",
+      "#KitchenKnives",
+      "#Bushcraft",
+      "#SurvivalKnife",
+      "#CulinaryTools",
+      "#PremiumKnives",
+      "#WildernessGear",
+      "#ProfessionalChef",
+      "#OutdoorAdventure"
+    ],
+    "instagramStyle": "Dark stone backgrounds, wooden cutting boards, outdoor camping environments, dramatic high-contrast lighting, premium product photography",
+    "facebookStyle": "Craftsmanship highlights, product features, customer stories, outdoor adventure themes, cooking demonstrations",
+    "pinterestStyle": "Lifestyle imagery, knife collections, wilderness survival guides, kitchen organization, camping gear",
+    "tiktokStyle": "Knife performance demos, outdoor survival tips, cooking techniques, product unboxing, behind-the-scenes craftsmanship"
+  },
+  
+  "productTitleFormat": {
+    "template": "Strapey {ProductType} – Crafted for Wild",
+    "examples": [
+      "Strapey Professional Forged Chef Knife – Crafted for Wild",
+      "Strapey Outdoor Hunting Skinning Knife – Crafted for Wild",
+      "Strapey Forged Kitchen Santoku Knife – Crafted for Wild"
+    ],
+    "guidelines": [
+      "Clear and professional",
+      "Strong keywords",
+      "Emphasize quality and craftsmanship",
+      "Maintain consistent format"
+    ]
+  },
+  
+  "productDescriptionEmphasis": [
+    "Forged quality and premium materials",
+    "Blade durability and performance",
+    "Precision cutting performance",
+    "Outdoor usability",
+    "Professional-grade craftsmanship"
+  ],
+  
+  "watermark": {
+    "enabled": true,
+    "text": "STRAPEY",
+    "subtext": "Crafted for Wild",
+    "position": "bottom-right",
+    "opacity": 0.6,
+    "fontSize": 24,
+    "color": "#ffffff",
+    "backgroundColor": "rgba(26, 77, 46, 0.75)"
+  },
+  
+  "brandStory": {
+    "headline": "Crafted for Wild – Where Wilderness Meets Craftsmanship",
+    "story": "Strapey was born from a passion for authentic tools that perform in the toughest conditions. Whether you're processing game in the wilderness or preparing a gourmet meal in your kitchen, our knives deliver the durability, precision, and reliability that serious users demand.\n\nInspired by the rugged beauty of the outdoors and the exacting standards of professional chefs, every Strapey blade represents a commitment to quality craftsmanship. We create tools built for real-world performance – knives that won't let you down when it matters most.\n\nFrom hunters and outdoor enthusiasts to professional chefs and home cooks who value premium tools, Strapey serves those who refuse to compromise on quality. Our blades are more than tools – they're trusted companions for life's adventures, both wild and culinary.",
+    "themes": [
+      "Craftsmanship inspired by wilderness",
+      "Tools designed for real-world performance",
+      "Knives built for the kitchen and the wild",
+      "Durability that professionals trust"
+    ],
+    "tone": "Authentic and inspiring, connecting emotionally with hunters, adventurers, and serious cooks"
+  }
+}

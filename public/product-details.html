@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scraped Product Details</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --success: #16a34a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 16px 24px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .crumbs { color: var(--muted); font-size: 13px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .runtime-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background-color: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      font-size: 12px;
+    }
+
+    .runtime-label {
+      font-weight: 700;
+      color: #6b7280;
+    }
+
+    .runtime-label.active {
+      color: #111827;
+    }
+
+    .runtime-switch {
+      position: relative;
+      width: 48px;
+      height: 24px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #9ca3af;
+      transition: background-color 0.2s;
+      padding: 0;
+    }
+
+    .runtime-switch[data-mode="prod"] {
+      background: #22c55e;
+    }
+
+    .runtime-switch-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .runtime-switch[data-mode="prod"] .runtime-switch-thumb {
+      transform: translateX(24px);
+    }
+
+    .runtime-pill {
+      font-weight: 600;
+      color: #4b5563;
+      background-color: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 999px;
+      padding: 2px 8px;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 13px;
+    }
+    .btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 520px) 1fr;
+      gap: 16px;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .main-img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: contain;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .thumbs {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 8px;
+    }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      background: #fff;
+    }
+    .title { margin: 0 0 8px; font-size: 24px; line-height: 1.25; }
+    .price { font-size: 30px; font-weight: 700; margin: 0; }
+    .meta { margin-top: 8px; color: var(--muted); font-size: 14px; }
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+    }
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    td {
+      border-top: 1px solid var(--border);
+      padding: 8px 6px;
+      font-size: 13px;
+      vertical-align: top;
+    }
+    td:first-child { width: 36%; color: var(--muted); }
+    pre {
+      white-space: pre-wrap;
+      margin: 0;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+    }
+    .error {
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      color: #9f1239;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 12px;
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="crumbs">Scraped Product Details • Compare with eBay listing</div>
+      <div class="actions">
+        <div class="runtime-toggle" title="Switch active environment for all channel integrations">
+          <span id="runtime-stage-label" class="runtime-label active">Stage</span>
+          <button id="runtime-switch" class="runtime-switch" data-mode="stage" onclick="toggleRuntimeEnvironment()" title="Toggle Stage/Prod mode">
+            <span class="runtime-switch-thumb"></span>
+          </button>
+          <span id="runtime-prod-label" class="runtime-label">Prod</span>
+          <span id="runtime-ebay-pill" class="runtime-pill">eBay: Sandbox</span>
+        </div>
+        <a class="btn" href="/">Back to Admin</a>
+        <a id="ebayLink" class="btn btn-primary" href="#" target="_blank" rel="noopener">View on eBay</a>
+      </div>
+    </div>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    let runtimeEnvironmentState = {
+      mode: 'stage',
+      serviceTargets: {
+        ebay: 'sandbox'
+      }
+    };
+
+    function getActiveEbayEnvironment() {
+      return runtimeEnvironmentState.serviceTargets?.ebay === 'production' ? 'production' : 'sandbox';
+    }
+
+    function renderRuntimeEnvironmentToggle() {
+      const mode = runtimeEnvironmentState.mode === 'prod' ? 'prod' : 'stage';
+      const ebayTarget = getActiveEbayEnvironment();
+      const switchEl = document.getElementById('runtime-switch');
+      const stageLabel = document.getElementById('runtime-stage-label');
+      const prodLabel = document.getElementById('runtime-prod-label');
+      const ebayPill = document.getElementById('runtime-ebay-pill');
+
+      if (!switchEl || !stageLabel || !prodLabel || !ebayPill) {
+        return;
+      }
+
+      switchEl.setAttribute('data-mode', mode);
+      stageLabel.classList.toggle('active', mode === 'stage');
+      prodLabel.classList.toggle('active', mode === 'prod');
+      ebayPill.textContent = `eBay: ${ebayTarget === 'production' ? 'Production' : 'Sandbox'}`;
+    }
+
+    async function loadRuntimeEnvironment() {
+      try {
+        const response = await fetch('http://localhost:3001/api/runtime/environment');
+        if (!response.ok) {
+          throw new Error('Failed to load runtime environment');
+        }
+
+        const data = await response.json();
+        runtimeEnvironmentState = {
+          mode: data.mode === 'prod' ? 'prod' : 'stage',
+          serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+        };
+      } catch (error) {
+        console.error('Runtime environment load failed:', error);
+      }
+
+      renderRuntimeEnvironmentToggle();
+    }
+
+    async function toggleRuntimeEnvironment() {
+      const switchEl = document.getElementById('runtime-switch');
+      const nextMode = runtimeEnvironmentState.mode === 'prod' ? 'stage' : 'prod';
+
+      if (switchEl) {
+        switchEl.disabled = true;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3001/api/runtime/environment', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: nextMode })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to switch runtime mode');
+        }
+
+        const data = await response.json();
+        runtimeEnvironmentState = {
+          mode: data.mode === 'prod' ? 'prod' : 'stage',
+          serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+        };
+
+        renderRuntimeEnvironmentToggle();
+      } catch (error) {
+        console.error('Runtime environment toggle failed:', error);
+        showToast('Failed to switch Stage/Prod mode: ' + error.message, 'error');
+      } finally {
+        if (switchEl) {
+          switchEl.disabled = false;
+        }
+      }
+    }
+
+    const query = new URLSearchParams(window.location.search);
+    const link = query.get('link') || '';
+
+    const content = document.getElementById('content');
+    const ebayLink = document.getElementById('ebayLink');
+
+    async function load() {
+      if (!link) {
+        content.innerHTML = '<div class="error">Missing product link in URL.</div>';
+        ebayLink.style.display = 'none';
+        return;
+      }
+
+      ebayLink.href = link;
+
+      try {
+        const response = await fetch(`http://localhost:3001/api/products/by-link?link=${encodeURIComponent(link)}`);
+        if (!response.ok) throw new Error('Failed to load scraped product details');
+
+        const product = await response.json();
+        const images = Array.isArray(product.images) ? product.images : [];
+        const mainImage = images[0] ? `http://localhost:3001/${images[0]}` : '';
+        const sku = product.sku || product.customLabel || 'N/A';
+        const specifics = product.itemSpecifics || {};
+
+        content.innerHTML = `
+          <div class="layout">
+            <div class="panel">
+              ${mainImage ? `<img id="mainImage" class="main-img" src="${mainImage}" alt="Product image" />` : '<div class="main-img" style="display:flex;align-items:center;justify-content:center;color:#9ca3af;">No image</div>'}
+              <div class="thumbs">
+                ${images.map((img, index) => `<img class="thumb" src="http://localhost:3001/${img}" alt="thumb-${index}" onclick="document.getElementById('mainImage') && (document.getElementById('mainImage').src=this.src)" />`).join('')}
+              </div>
+            </div>
+
+            <div class="panel">
+              <h1 class="title">${product.title || 'Untitled'}</h1>
+              <p class="price">$${typeof product.price === 'number' ? product.price.toFixed(2) : 'N/A'}</p>
+              <div class="meta">SKU: <strong>${sku}</strong></div>
+              <div class="meta">Item Number: <strong>${product.itemNumber || 'N/A'}</strong></div>
+              <div class="meta">Format: <strong>${product.format || 'N/A'}</strong></div>
+              <div class="meta">Quantity: <strong>${product.availableQuantity || 'N/A'}</strong></div>
+              <div class="meta">Last Updated: <strong>${product.lastUpdated || 'N/A'}</strong></div>
+              <div class="badge">Scraped from eBay</div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top:16px;">
+            <h2 class="section-title">Item Specifics</h2>
+            <table>
+              ${Object.keys(specifics).length
+                ? Object.entries(specifics).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')
+                : '<tr><td colspan="2">No item specifics available.</td></tr>'}
+            </table>
+          </div>
+
+          <div class="panel" style="margin-top:16px;">
+            <h2 class="section-title">Description</h2>
+            <pre>${product.description || 'No description available.'}</pre>
+          </div>
+        `;
+      } catch (error) {
+        content.innerHTML = `<div class="error">${error.message}</div>`;
+      }
+    }
+
+    loadRuntimeEnvironment();
+    load();
+  </script>
+  
+  <!-- Toast Container -->
+  <div id="toastContainer"></div>
+  
+  <style>
+  /* Toast Notification Styles */
+  #toastContainer {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+  }
+  
+  .toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+    min-width: 300px;
+    backdrop-filter: blur(10px);
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+  
+  .toast-success {
+    background: linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%);
+    color: white;
+  }
+  
+  .toast-error {
+    background: linear-gradient(135deg, #c62828 0%, #ef5350 100%);
+    color: white;
+  }
+  
+  .toast-warning {
+    background: linear-gradient(135deg, #f57c00 0%, #ffa726 100%);
+    color: white;
+  }
+  
+  .toast-info {
+    background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+    color: white;
+  }
+  
+  .toast-icon {
+    font-size: 24px;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  
+  .toast-content {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.5;
+    word-wrap: break-word;
+  }
+  
+  .toast-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  
+  .toast-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  </style>
+  
+  <script>
+  // Toast Notification System
+  function showToast(message, type = 'info', duration = 5000) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    const icons = {
+      success: '✓',
+      error: '✗',
+      warning: '⚠',
+      info: 'ℹ'
+    };
+    
+    toast.innerHTML = `
+      <div class="toast-icon">${icons[type] || 'ℹ'}</div>
+      <div class="toast-content">${message}</div>
+      <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease-out forwards';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+  </script>
+</body>
+</html>

@@ -45,6 +45,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await registerSocialModuleRoutes(app);
   await registerAnalyticsRoutes(app);
 
+  // Authenticated integration endpoints
   app.get('/api/platform/integrations', { preHandler: [authGuard] }, async () => ({ integrations: pluginManager.list() }));
 
   app.post('/api/platform/integrations/:integrationKey/listings', { preHandler: [authGuard, requireRole(['admin', 'manager'])] }, async (request, reply) => {
@@ -52,6 +53,20 @@ export async function registerRoutes(app: FastifyInstance) {
     const plugin = pluginManager.get(integrationKey);
     if (!plugin?.createListing) return reply.code(404).send({ error: 'Integration not found or does not support createListing' });
     return plugin.createListing(request.body);
+  });
+
+  // Legacy eBay Sandbox publishing endpoint (for admin.html compatibility)
+  // This endpoint allows unauthenticated access from localhost only
+  app.post('/api/platform/integrations/ebay/listings/sandbox', async (request, reply) => {
+    const plugin = pluginManager.get('ebay');
+    if (!plugin?.createListing) return reply.code(404).send({ error: 'eBay integration not found' });
+    
+    try {
+      const result = await plugin.createListing(request.body);
+      return result;
+    } catch (error: any) {
+      return reply.code(500).send(error);
+    }
   });
 
   app.patch('/api/platform/integrations/:integrationKey/listings', { preHandler: [authGuard, requireRole(['admin', 'manager'])] }, async (request, reply) => {

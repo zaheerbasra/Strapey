@@ -6,11 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.applySchema = applySchema;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const pg_1 = require("../core/db/pg");
+const sqlite_1 = require("../core/db/sqlite");
 async function applySchema() {
-    const filePath = path_1.default.join(process.cwd(), 'src', 'platform', 'database', 'schema.sql');
+    const filePath = path_1.default.join(process.cwd(), 'src', 'platform', 'database', 'schema-sqlite.sql');
     const sql = fs_1.default.readFileSync(filePath, 'utf-8');
-    await pg_1.pgPool.query('CREATE EXTENSION IF NOT EXISTS pgcrypto;');
-    await pg_1.pgPool.query(sql);
+    (0, sqlite_1.exec)(sql);
     return { applied: true };
 }

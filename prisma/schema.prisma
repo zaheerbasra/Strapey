@@ -27,20 +27,67 @@ model Product {
   // Product specifics
   category    String?
   weight      Float?
-  dimensions  String?  // JSON: {length, width, height}
+  weightUnit  String?  // lb, oz
+  dimensions  String?  // JSON: {length, width, height, unit}
   specifics   String?  // JSON: item-specific attributes
   
+  // eBay-specific fields (CRITICAL for publishing)
+  ebayItemNumber   String?   @unique  // Original eBay item number
+  ebayLink         String?   // Original eBay listing link
+  ebayCategory     String?   // eBay category name (e.g., "Pistol Parts")
+  ebayCategoryId   String?   // eBay category ID (e.g., "73944") - CRITICAL for publishing
+  ebayMetadata     String?   // JSON: Additional eBay data from import
+  availableQuantity Int?     // Quantity from eBay listing
+  currency         String?   // Currency code (USD, GBP, etc.)
+  
   // Metadata
-  sourceUrl   String?  // Original eBay URL if scraped
+  sourceUrl   String?  // Original source URL if scraped
+  scrapedAt   DateTime? // When product was last scraped
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
   // Relations
   listings    Listing[]
   orderItems  OrderItem[]
+  activityLogs ProductActivityLog[]
   
   @@index([sku])
+  @@index([ebayItemNumber])
+  @@index([ebayCategoryId])
   @@index([createdAt])
+}
+
+// ============================================
+// PRODUCT ACTIVITY LOGS - Audit Trail
+// ============================================
+model ProductActivityLog {
+  id              String   @id @default(uuid())
+  productId       String
+  
+  // Action details
+  actionType      String   // PRODUCT_CREATED, PRODUCT_UPDATED, PRODUCT_SCRAPED_FROM_EBAY, etc.
+  actionDescription String // Human-readable description
+  
+  // Change tracking
+  previousValue   String?  // JSON: old state
+  newValue        String?  // JSON: new state
+  
+  // Metadata
+  performedBy     String?  // user ID or "system"
+  sourceSystem    String   @default("strapey") // strapey, scraper, admin, api
+  ipAddress       String?
+  userAgent       String?
+  
+  // Timestamp
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@index([productId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@index([productId, createdAt])
 }
 
 // ============================================

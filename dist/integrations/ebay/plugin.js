@@ -1,11 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ebayPlugin = void 0;
 exports.runIntelligentCompetitorScraper = runIntelligentCompetitorScraper;
-const axios_1 = __importDefault(require("axios"));
+const axios_1 = require("axios");
 const queue_1 = require("../../core/queue");
 exports.ebayPlugin = {
     key: 'ebay',

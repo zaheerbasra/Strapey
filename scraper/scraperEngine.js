@@ -164,6 +164,14 @@ class ScraperEngine {
         startPrice: null,
         variationDetails: {},
         itemSpecifics: {},
+        weight: null,
+        weightUnit: null,
+        dimensions: {
+          length: null,
+          width: null,
+          height: null,
+          unit: 'in'
+        }
       };
 
       // Extract item number from URL
@@ -194,16 +202,54 @@ class ScraperEngine {
         }
       });
 
-      // Item Specifics
+      // Item Specifics with Weight & Dimensions parsing
       const specificsContainer = document.querySelectorAll('[class*="ux-labels-values"], .ux-layout-section__row');
       specificsContainer.forEach((row) => {
         const label = row.querySelector('[class*="ux-labels-values__labels"]');
         const value = row.querySelector('[class*="ux-labels-values__values"]');
         if (label && value) {
-          const labelText = label.textContent.trim().replace(':', '');
+          const labelText = label.textContent.trim().replace(':', '').trim();
           const valueText = value.textContent.trim();
           if (labelText && valueText) {
             result.itemSpecifics[labelText] = valueText;
+            
+            // Parse Weight
+            if (labelText.toLowerCase().includes('weight')) {
+              // Match patterns like "2.5 lb", "16 oz", "2.5 pounds", etc.
+              const weightMatch = valueText.match(/^([\d.]+)\s*(lb|oz|pounds|ounces)?/i);
+              if (weightMatch) {
+                result.weight = parseFloat(weightMatch[1]);
+                let unit = weightMatch[2] || 'lb';
+                result.weightUnit = unit.toLowerCase().startsWith('oz') ? 'oz' : 'lb';
+              }
+            }
+            
+            // Parse Dimensions (L x W x H)
+            if (labelText.toLowerCase().includes('dimension') || labelText.toLowerCase().includes('size')) {
+              // Match patterns like "10 x 5 x 3 in", "10x5x3 inches", "10 in x 5 in x 3 in"
+              const dimMatch = valueText.match(/^([\d.]+)\s*x\s*([\d.]+)\s*x\s*([\d.]+)/i);
+              if (dimMatch) {
+                result.dimensions.length = parseFloat(dimMatch[1]);
+                result.dimensions.width = parseFloat(dimMatch[2]);
+                result.dimensions.height = parseFloat(dimMatch[3]);
+                result.dimensions.unit = 'in'; // Default to inches
+                
+                // Check if unit is specified (inches, cm, etc.)
+                const unitMatch = valueText.match(/(in|inch|cm|mm|ft|feet)\b/i);
+                if (unitMatch) {
+                  const detectedUnit = unitMatch[1].toLowerCase();
+                  if (detectedUnit.includes('cm')) {
+                    result.dimensions.unit = 'cm';
+                  } else if (detectedUnit.includes('mm')) {
+                    result.dimensions.unit = 'mm';
+                  } else if (detectedUnit.includes('ft') || detectedUnit.includes('feet')) {
+                    result.dimensions.unit = 'ft';
+                  } else {
+                    result.dimensions.unit = 'in';
+                  }
+                }
+              }
+            }
           }
         }
       });
@@ -247,6 +293,7 @@ class ScraperEngine {
     }
 
     const imagePaths = [];
+    const { findOrRegisterImage } = require('../src/utils/image-deduplication');
 
     for (let i = 0; i < imageUrls.length; i++) {
       try {
@@ -257,10 +304,25 @@ class ScraperEngine {
         const buffer = await viewSource.buffer();
         
         const extension = imageUrl.includes('.webp') ? 'webp' : 'jpg';
-        const imagePath = path.join(imageFolder, `image_${i}.${extension}`);
+        const proposedPath = path.join(imageFolder, `image_${i}.${extension}`);
         
-        fs.writeFileSync(imagePath, buffer);
-        imagePaths.push(imagePath.replace(this.config.output.imagePath + '/', ''));
+        // Check if this image already exists (by content/perceptual hash)
+        const result = await findOrRegisterImage(
+          buffer, 
+          proposedPath, 
+          this.config.output.imagePath
+        );
+        
+        if (result.isDuplicate) {
+          // Reuse existing image, don't write to disk
+          imagePaths.push(result.path);
+          this.logger.info(`Reusing existing image: ${result.path}`);
+        } else {
+          // New image, write to disk
+          fs.writeFileSync(proposedPath, buffer);
+          imagePaths.push(result.path);
+          this.logger.info(`Downloaded new image: ${result.path}`);
+        }
         
         await page.close();
       } catch (error) {

@@ -1,0 +1,53 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">  <!-- Forest Green Circle Background -->
+  <circle cx="50" cy="50" r="48" fill="#1a4d2e" stroke="#2c2c2c" stroke-width="3"/>
+  
+  <!-- Knife Blade -->
+  <g transform="translate(50, 50)">
+    <!-- Main Blade -->
+    <path d="M -25,-5 L 28,5 L 28,10 L -25,0 Z" fill="#6b7280" stroke="#ffffff" stroke-width="1.5"/>
+    <path d="M -25,-5 L 28,5 L 25,6 L -25,-3 Z" fill="#808080" opacity="0.7"/>
+    
+    <!-- Blade Edge Highlight -->
+    <line x1="-25" y1="-4" x2="25" y2="6" stroke="#ffffff" stroke-width="0.8" opacity="0.4"/>
+    
+    <!-- Handle -->
+    <rect x="-35" y="-4" width="14" height="12" fill="#92400e" stroke="#ffffff" stroke-width="1.2"/>
+    <rect x="-34" y="-2" width="12" height="2" fill="#d97706" opacity="0.8"/>
+    <rect x="-34" y="4" width="12" height="2" fill="#d97706" opacity="0.8"/>
+    
+    <!-- Handle Rivet Details -->
+    <circle cx="-28" cy="2" r="1.5" fill="#b45309"/>
+  </g>
+  
+  <!-- Letter 'S' Subtle Overlay -->
+  <text x="50" y="85" 
+        font-family="'Bebas Neue', 'Impact', sans-serif" 
+        font-size="16" 
+        font-weight="900" 
+        fill="#d97706" 
+        text-anchor="middle"
+        letter-spacing="1">S</text>  <!-- Circle Background -->
+  <circle cx="60" cy="60" r="58" fill="#2d4a3e" stroke="#c25e28" stroke-width="3"/>
+  
+  <!-- Mountain Silhouette -->
+  <polygon points="30,55 45,35 60,48 75,30 90,55" fill="#1a2d25" opacity="0.6"/>
+  <polygon points="40,55 55,42 70,55" fill="#1f3329"/>
+  
+  <!-- Knife Blade -->
+  <g id="icon-knife">
+    <path d="M 55,40 L 65,48 L 65,78 L 55,82 Z" fill="#9ca3af" stroke="#3a3a3a" stroke-width="2"/>
+    <!-- Damascus pattern lines -->
+    <line x1="58" y1="52" x2="62" y2="56" stroke="#ffffff" stroke-width="1" opacity="0.4"/>
+    <line x1="58" y1="60" x2="62" y2="64" stroke="#ffffff" stroke-width="1" opacity="0.4"/>
+    <line x1="58" y1="68" x2="62" y2="72" stroke="#ffffff" stroke-width="1" opacity="0.4"/>
+  </g>
+  
+  <!-- Handle -->
+  <rect x="52" y="82" width="16" height="22" rx="2" fill="#8b6f47"/>
+  <line x1="54" y1="88" x2="66" y2="88" stroke="#5a4a33" stroke-width="0.6" opacity="0.6"/>
+  <line x1="54" y1="94" x2="66" y2="94" stroke="#5a4a33" stroke-width="0.6" opacity="0.6"/>
+  <line x1="54" y1="100" x2="66" y2="100" stroke="#5a4a33" stroke-width="0.6" opacity="0.6"/>
+  
+  <!-- Accent Circle -->
+  <circle cx="60" cy="60" r="58" fill="none" stroke="#c25e28" stroke-width="2" opacity="0.3"/>
+</svg>

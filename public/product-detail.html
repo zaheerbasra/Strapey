@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Details - Strapey</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background-color: #f5f5f5;
+            color: #222;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 16px;
+            background-color: white;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #222;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .runtime-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 10px;
+            background-color: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            font-size: 12px;
+        }
+
+        .runtime-label {
+            font-weight: 700;
+            color: #6b7280;
+        }
+
+        .runtime-label.active {
+            color: #111827;
+        }
+
+        .runtime-switch {
+            position: relative;
+            width: 48px;
+            height: 24px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            background: #9ca3af;
+            transition: background-color 0.2s;
+            padding: 0;
+        }
+
+        .runtime-switch[data-mode="prod"] {
+            background: #22c55e;
+        }
+
+        .runtime-switch-thumb {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ffffff;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .runtime-switch[data-mode="prod"] .runtime-switch-thumb {
+            transform: translateX(24px);
+        }
+
+        .runtime-pill {
+            font-weight: 600;
+            color: #4b5563;
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            padding: 2px 8px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            color: #222;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+
+        /* Image Gallery */
+        .image-gallery {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .main-image {
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .main-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .thumbnail-strip {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+
+        .thumbnail {
+            width: 80px;
+            height: 80px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            overflow: hidden;
+            flex-shrink: 0;
+            background-color: #f9f9f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .thumbnail.active {
+            border-color: #e53238;
+        }
+
+        /* Product Info */
+        .product-info {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .title {
+            font-size: 28px;
+            font-weight: 600;
+            line-height: 1.3;
+            color: #222;
+        }
+
+        .sku-section {
+            padding: 12px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .price-section {
+            border-top: 1px solid #eee;
+            border-bottom: 1px solid #eee;
+            padding: 16px 0;
+        }
+
+        .price {
+            font-size: 32px;
+            font-weight: 700;
+            color: #e53238;
+            margin-bottom: 8px;
+        }
+
+        .currency {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .item-specifics {
+            padding: 16px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+
+        .item-specifics h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #222;
+        }
+
+        .specifics-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .specifics-item {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .specifics-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .specifics-label {
+            font-weight: 600;
+            color: #222;
+            min-width: 120px;
+        }
+
+        .specifics-value {
+            color: #666;
+            text-align: right;
+            flex: 1;
+            padding-left: 12px;
+        }
+
+        .condition-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Description */
+        .description-section {
+            padding: 24px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            margin-top: 24px;
+        }
+
+        .description-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #222;
+        }
+
+        .description {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #666;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .original-link {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 10px 16px;
+            background-color: #e53238;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .original-link:hover {
+            background-color: #c41f26;
+        }
+
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid #eee;
+        }
+
+        .metadata-item {
+            text-align: center;
+        }
+
+        .metadata-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metadata-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #222;
+            margin-top: 4px;
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #e53238;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c41f26;
+            padding: 16px;
+            border-radius: 4px;
+            border: 1px solid #ef5350;
+        }
+
+        .image-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f0f0f0;
+            color: #999;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Product Details</h1>
+            <div class="header-actions">
+                <div class="runtime-toggle" title="Switch active environment for all channel integrations">
+                    <span id="runtime-stage-label" class="runtime-label active">Stage</span>
+                    <button id="runtime-switch" class="runtime-switch" data-mode="stage" onclick="toggleRuntimeEnvironment()" title="Toggle Stage/Prod mode">
+                        <span class="runtime-switch-thumb"></span>
+                    </button>
+                    <span id="runtime-prod-label" class="runtime-label">Prod</span>
+                    <span id="runtime-ebay-pill" class="runtime-pill">eBay: Sandbox</span>
+                </div>
+                <button class="close-btn" onclick="window.close()">&times;</button>
+            </div>
+        </div>
+
+        <div id="content-area">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading product details...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let runtimeEnvironmentState = {
+            mode: 'stage',
+            serviceTargets: {
+                ebay: 'sandbox'
+            }
+        };
+
+        function getActiveEbayEnvironment() {
+            return runtimeEnvironmentState.serviceTargets?.ebay === 'production' ? 'production' : 'sandbox';
+        }
+
+        function renderRuntimeEnvironmentToggle() {
+            const mode = runtimeEnvironmentState.mode === 'prod' ? 'prod' : 'stage';
+            const ebayTarget = getActiveEbayEnvironment();
+            const switchEl = document.getElementById('runtime-switch');
+            const stageLabel = document.getElementById('runtime-stage-label');
+            const prodLabel = document.getElementById('runtime-prod-label');
+            const ebayPill = document.getElementById('runtime-ebay-pill');
+
+            if (!switchEl || !stageLabel || !prodLabel || !ebayPill) {
+                return;
+            }
+
+            switchEl.setAttribute('data-mode', mode);
+            stageLabel.classList.toggle('active', mode === 'stage');
+            prodLabel.classList.toggle('active', mode === 'prod');
+            ebayPill.textContent = `eBay: ${ebayTarget === 'production' ? 'Production' : 'Sandbox'}`;
+        }
+
+        async function loadRuntimeEnvironment() {
+            try {
+                const response = await fetch('http://localhost:3001/api/runtime/environment');
+                if (!response.ok) {
+                    throw new Error('Failed to load runtime environment');
+                }
+
+                const data = await response.json();
+                runtimeEnvironmentState = {
+                    mode: data.mode === 'prod' ? 'prod' : 'stage',
+                    serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+                };
+            } catch (error) {
+                console.error('Runtime environment load failed:', error);
+            }
+
+            renderRuntimeEnvironmentToggle();
+        }
+
+        async function toggleRuntimeEnvironment() {
+            const switchEl = document.getElementById('runtime-switch');
+            const nextMode = runtimeEnvironmentState.mode === 'prod' ? 'stage' : 'prod';
+
+            if (switchEl) {
+                switchEl.disabled = true;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3001/api/runtime/environment', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: nextMode })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to switch runtime mode');
+                }
+
+                const data = await response.json();
+                runtimeEnvironmentState = {
+                    mode: data.mode === 'prod' ? 'prod' : 'stage',
+                    serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+                };
+
+                renderRuntimeEnvironmentToggle();
+            } catch (error) {
+                console.error('Runtime environment toggle failed:', error);
+                showToast('Failed to switch Stage/Prod mode: ' + error.message, 'error');
+            } finally {
+                if (switchEl) {
+                    switchEl.disabled = false;
+                }
+            }
+        }
+
+        async function loadProductData() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const productId = urlParams.get('id');
+
+                if (!productId) {
+                    throw new Error('Product ID not provided');
+                }
+
+                const response = await fetch(`http://localhost:3001/api/products/${encodeURIComponent(productId)}/scraped-data`);
+                if (!response.ok) {
+                    throw new Error('Failed to load product data');
+                }
+
+                const data = await response.json();
+                const product = data.scrapedData;
+
+                // Determine which images to use
+                const imageUrls = (product.images && product.images.length > 0)
+                    ? product.images
+                    : (product.localImages && product.localImages.length > 0)
+                    ? product.localImages.map(img => `http://localhost:3001/${img}`)
+                    : [];
+
+                // Build the HTML
+                const contentHtml = `
+                    <div class="content">
+                        <!-- Image Gallery -->
+                        <div class="image-gallery">
+                            <div class="main-image" id="main-image">
+                                ${imageUrls.length > 0
+                                    ? `<img src="${imageUrls[0]}" alt="${escapeHtml(product.title)}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiBhbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBBdmFpbGFibGU8L3RleHQ+PC9zdmc+'">`
+                                    : '<div class="image-placeholder">No Images Available</div>'
+                                }
+                            </div>
+                            ${imageUrls.length > 1 ? `
+                                <div class="thumbnail-strip" id="thumbnails">
+                                    ${imageUrls.map((url, idx) => `
+                                        <div class="thumbnail ${idx === 0 ? 'active' : ''}" onclick="selectImage(${idx})">
+                                            <img src="${url}" alt="Thumbnail ${idx + 1}" onerror="this.parentElement.innerHTML='<div class=image-placeholder>N/A</div>'">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Product Info -->
+                        <div class="product-info">
+                            <h1 class="title">${escapeHtml(product.title)}</h1>
+
+                            ${product.sku ? `
+                                <div class="sku-section">
+                                    <strong>SKU:</strong> ${escapeHtml(product.sku)}
+                                </div>
+                            ` : ''}
+
+                            <div class="price-section">
+                                <div class="price">
+                                    <span class="currency">${product.currency || 'USD'}</span> ${typeof product.price === 'number' ? product.price.toFixed(2) : product.price}
+                                </div>
+                            </div>
+
+                            ${Object.keys(product.itemSpecifics || {}).length > 0 ? `
+                                <div class="item-specifics">
+                                    <h3>Item Specifics</h3>
+                                    <div class="specifics-list">
+                                        ${Object.entries(product.itemSpecifics)
+                                            .map(([key, value]) => `
+                                                <div class="specifics-item">
+                                                    <span class="specifics-label">${escapeHtml(key)}:</span>
+                                                    <span class="specifics-value">
+                                                        ${Array.isArray(value)
+                                                            ? value.map(v => escapeHtml(String(v))).join(', ')
+                                                            : escapeHtml(String(value))}
+                                                    </span>
+                                                </div>
+                                            `).join('')}
+                                    </div>
+                                </div>
+                            ` : ''}
+
+                            ${product.condition ? `
+                                <div>
+                                    <span class="condition-badge">${escapeHtml(product.condition)} Condition</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    ${product.description ? `
+                        <div class="description-section">
+                            <h3>Description</h3>
+                            <div class="description">${escapeHtml(product.description)}</div>
+                            ${product.url ? `
+                                <a href="${escapeHtml(product.url)}" target="_blank" rel="noopener" class="original-link">View Original Listing</a>
+                            ` : ''}
+                        </div>
+                    ` : ''}
+
+                    <!-- Metadata -->
+                    <div class="metadata">
+                        ${product.lastScrapedAt ? `
+                            <div class="metadata-item">
+                                <div class="metadata-label">Last Updated</div>
+                                <div class="metadata-value">${new Date(product.lastScrapedAt).toLocaleDateString()}</div>
+                            </div>
+                        ` : ''}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Images</div>
+                            <div class="metadata-value">${imageUrls.length}</div>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('content-area').innerHTML = contentHtml;
+                window.productImages = imageUrls;
+            } catch (error) {
+                console.error('Error loading product:', error);
+                document.getElementById('content-area').innerHTML = `
+                    <div class="error">
+                        Error loading product details: ${escapeHtml(error.message)}
+                    </div>
+                `;
+            }
+        }
+
+        function selectImage(index) {
+            if (window.productImages && window.productImages[index]) {
+                const mainImage = document.getElementById('main-image');
+                mainImage.innerHTML = `<img src="${window.productImages[index]}" alt="Product Image" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiBhbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIE5vdCBBdmFpbGFibGU8L3RleHQ+PC9zdmc+'">`;
+
+                // Update active thumbnail
+                const thumbnails = document.querySelectorAll('.thumbnail');
+                thumbnails.forEach((thumb, idx) => {
+                    thumb.classList.toggle('active', idx === index);
+                });
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load page data when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRuntimeEnvironment();
+            loadProductData();
+        });
+    </script>
+    
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+    
+    <style>
+    /* Toast Notification Styles */
+    #toastContainer {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 400px;
+    }
+    
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease-out;
+      min-width: 300px;
+      backdrop-filter: blur(10px);
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+    
+    .toast-success {
+      background: linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%);
+      color: white;
+    }
+    
+    .toast-error {
+      background: linear-gradient(135deg, #c62828 0%, #ef5350 100%);
+      color: white;
+    }
+    
+    .toast-warning {
+      background: linear-gradient(135deg, #f57c00 0%, #ffa726 100%);
+      color: white;
+    }
+    
+    .toast-info {
+      background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+      color: white;
+    }
+    
+    .toast-icon {
+      font-size: 24px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    
+    .toast-content {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    
+    .toast-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    </style>
+    
+    <script>
+    // Toast Notification System
+    function showToast(message, type = 'info', duration = 5000) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      
+      const icons = {
+        success: '✓',
+        error: '✗',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || 'ℹ'}</div>
+        <div class="toast-content">${message}</div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Auto-remove after duration
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+    </script>
+</body>
+</html>

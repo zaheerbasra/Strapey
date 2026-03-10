@@ -6,25 +6,27 @@
   <title>Strapey - Enterprise Platform</title>
   <style>
     :root {
-      --color-primary: #6366f1;
-      --color-primary-dark: #4f46e5;
-      --color-accent: #22c55e;
-      --color-danger: #ef4444;
-      --color-warning: #f59e0b;
-      --color-info: #0ea5e9;
+      /* Strapey Black & White Brand Colors */
+      --color-primary: #000000;
+      --color-primary-dark: #0a0a0a;
+      --color-accent: #808080;
+      --color-danger: #cc0000;
+      --color-warning: #ff8800;
+      --color-info: #606060;
+      --color-success: #1a1a1a;
       
       color-scheme: light;
       
       /* Light mode colors */
       --bg-primary: #ffffff;
-      --bg-secondary: #f9fafb;
-      --bg-tertiary: #f3f4f6;
-      --text-primary: #1f2937;
-      --text-secondary: #6b7280;
-      --text-tertiary: #9ca3af;
-      --border-color: #e5e7eb;
-      --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      --bg-secondary: #f0f0f0;
+      --bg-tertiary: #e0e0e0;
+      --text-primary: #000000;
+      --text-secondary: #606060;
+      --text-tertiary: #808080;
+      --border-color: #c0c0c0;
+      --shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
     }
 
     html[data-theme="dark"] {
@@ -82,9 +84,29 @@
     }
 
     .logo {
-      font-size: 20px;
-      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .logo img {
+      height: 45px;
+      width: auto;
+    }
+    
+    .logo-text {
+      font-size: 18px;
+      font-weight: 900;
       color: var(--color-primary);
+      letter-spacing: 1px;
+    }
+    
+    .logo-tagline {
+      font-size: 9px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: -4px;
     }
 
     .app-title {
@@ -111,6 +133,69 @@
 
     .theme-toggle:hover {
       background-color: var(--bg-tertiary);
+    }
+
+    .runtime-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      font-size: 12px;
+    }
+
+    .runtime-label {
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: var(--text-secondary);
+      transition: color 0.2s;
+    }
+
+    .runtime-label.active {
+      color: var(--text-primary);
+    }
+
+    .runtime-switch {
+      position: relative;
+      width: 48px;
+      height: 24px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: #9ca3af;
+      transition: background-color 0.2s;
+      padding: 0;
+    }
+
+    .runtime-switch[data-mode="prod"] {
+      background: #22c55e;
+    }
+
+    .runtime-switch-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      transition: transform 0.2s;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .runtime-switch[data-mode="prod"] .runtime-switch-thumb {
+      transform: translateX(24px);
+    }
+
+    .runtime-pill {
+      font-weight: 600;
+      color: var(--text-secondary);
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      padding: 2px 8px;
     }
 
     .user-menu {
@@ -527,6 +612,17 @@
       }
     }
 
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .layout {
@@ -565,12 +661,22 @@
     <!-- Header -->
     <header>
       <div class="header-left">
-        <div class="logo">📦</div>
+        <div class="logo">
+          <img src="/assets/logo-horizontal.svg" alt="Strapey - Crafted for the Wild" />
+        </div>
         <div>
-          <div class="app-title">Strapey Enterprise Platform</div>
+          <div class="app-title">Enterprise Platform</div>
         </div>
       </div>
       <div class="header-right">
+        <div class="runtime-toggle" title="Switch active environment for all channel integrations">
+          <span id="runtime-stage-label" class="runtime-label active">Stage</span>
+          <button id="runtime-switch" class="runtime-switch" data-mode="stage" onclick="toggleRuntimeEnvironment()" title="Toggle Stage/Prod mode">
+            <span class="runtime-switch-thumb"></span>
+          </button>
+          <span id="runtime-prod-label" class="runtime-label">Prod</span>
+          <span id="runtime-ebay-pill" class="runtime-pill">eBay: Sandbox</span>
+        </div>
         <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
           <span id="theme-icon">🌙</span>
         </button>
@@ -673,9 +779,9 @@
             <div class="stat-change">Pending fulfillment</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Inventory Items</div>
+            <div class="stat-label">Active on eBay</div>
             <div class="stat-value" id="stat-inventory">0</div>
-            <div class="stat-change">In stock</div>
+            <div class="stat-change">Published items</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Channels Connected</div>
@@ -747,14 +853,176 @@
           <p class="page-subtitle">Manage your product catalog</p>
         </div>
 
-        <div style="margin-bottom: 24px;">
+        <div style="margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
           <button class="btn btn-primary" onclick="openProductModal()">
             ➕ New Product
           </button>
+          
+          <!-- CORE FEATURES: Smart Bulk Operations -->
+          <button class="btn" onclick="startSmartBulkScrape()" 
+            style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; font-weight: 600; white-space: nowrap; padding: 10px 20px; border: none; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);">
+            🔄 Scrape Latest Data
+          </button>
+          
+          <button class="btn" onclick="startBulkUploadToEbay()" 
+            style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-weight: 600; white-space: nowrap; padding: 10px 20px; border: none; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
+            🚀 Upload All to eBay
+          </button>
+          
+          <!-- Inventory Default Setter -->
+          <div style="display: flex; gap: 8px; align-items: center; background: white; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0;">Inventory Default:</label>
+            <input 
+              type="number" 
+              id="inventoryDefaultInput" 
+              min="0" 
+              value="3" 
+              style="width: 70px; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; text-align: center;"
+            />
+            <button class="btn btn-secondary" onclick="setInventoryDefault(event)" style="padding: 8px 14px; white-space: nowrap;">
+              📦 Apply to Zero Stock
+            </button>
+          </div>
+          
+          <!-- SEO Cleanup Button -->
+          <button class="btn btn-secondary" onclick="cleanupAllTitles()" style="white-space: nowrap;">
+            ✨ SEO Cleanup All
+          </button>
+        </div>
+        
+        <!-- Progress Tracking Card for Bulk Operations -->
+        <div id="bulkOperationProgress" style="display: none; margin-bottom: 24px;">
+          <div class="card" style="border-left: 4px solid #3b82f6; background: linear-gradient(to right, #eff6ff 0%, #ffffff 100%);">
+            <div style="padding: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                  <h3 id="bulkOpTitle" style="margin: 0 0 4px 0; font-size: 18px; font-weight: 700; color: #1f2937;">Operation in Progress</h3>
+                  <p id="bulkOpSubtitle" style="margin: 0; font-size: 14px; color: #6b7280;">Processing...</p>
+                </div>
+                <button onclick="closeBulkProgress()" style="background: none; border: none; font-size: 24px; color: #9ca3af; cursor: pointer; padding: 0; line-height: 1;">×</button>
+              </div>
+              
+              <!-- Progress Bar -->
+              <div style="background: #e5e7eb; border-radius: 9999px; height: 8px; overflow: hidden; margin-bottom: 16px;">
+                <div id="bulkOpProgressBar" style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%); height: 100%; width: 0%; transition: width 0.3s ease; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);"></div>
+              </div>
+              
+              <!-- Stats Grid -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Progress</div>
+                  <div id="bulkOpProgress" style="font-size: 20px; font-weight: 700; color: #1f2937;">0%</div>
+                </div>
+                <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Processed</div>
+                  <div id="bulkOpProcessed" style="font-size: 20px; font-weight: 700; color: #1f2937;">0 / 0</div>
+                </div>
+                <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; font-weight: 600; color: #10b981; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Success</div>
+                  <div id="bulkOpSuccess" style="font-size: 20px; font-weight: 700; color: #10b981;">0</div>
+                </div>
+                <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; font-weight: 600; color: #ef4444; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Failures</div>
+                  <div id="bulkOpFailures" style="font-size: 20px; font-weight: 700; color: #ef4444;">0</div>
+                </div>
+                <div id="bulkOpChangesCard" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: none;">
+                  <div style="font-size: 11px; font-weight: 600; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Updated</div>
+                  <div id="bulkOpUpdated" style="font-size: 20px; font-weight: 700; color: #f59e0b;">0</div>
+                </div>
+                <div id="bulkOpUnchangedCard" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: none;">
+                  <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Unchanged</div>
+                  <div id="bulkOpUnchanged" style="font-size: 20px; font-weight: 700; color: #6b7280;">0</div>
+                </div>
+              </div>
+              
+              <!-- ETA & Status -->
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <div>
+                  <span style="font-size: 12px; color: #6b7280;">Status:</span>
+                  <span id="bulkOpStatus" style="font-size: 13px; font-weight: 600; color: #3b82f6; margin-left: 8px;">Running</span>
+                </div>
+                <div id="bulkOpETA" style="font-size: 12px; color: #6b7280;"></div>
+              </div>
+              
+              <!-- Recent Activity -->
+              <div id="bulkOpRecentActivity" style="margin-top: 16px; max-height: 200px; overflow-y: auto; background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 12px;">
+                <div style="font-size: 12px; font-weight: 600; color: #6b7280; margin-bottom: 8px;">Recent Activity</div>
+                <div id="bulkOpActivityLog" style="font-size: 12px; color: #4b5563; font-family: 'SF Mono', Monaco, monospace;"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="card">
           <div class="card-title">Product Catalog</div>
+          
+          <!-- Search and Filter Controls -->
+          <div style="padding: 20px; background: linear-gradient(to bottom, #fafbfc 0%, #ffffff 100%); border-bottom: 1px solid var(--border);">
+            <!-- Search Bar -->
+            <div style="margin-bottom: 16px;">
+              <div style="position: relative; max-width: 600px;">
+                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 16px;">🔍</span>
+                <input type="text" id="productSearch" placeholder="Search by SKU, title, or item number..." 
+                  style="width: 100%; padding: 10px 12px 10px 38px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s; outline: none;"
+                  onkeyup="handleProductSearch()"
+                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'"
+                  onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none'">
+              </div>
+            </div>
+            
+            <!-- Filters Row -->
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+              <!-- Status Filter Group -->
+              <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                <label style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Status:</label>
+                <select id="statusFilter" onchange="applyFilters()" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; font-weight: 500; cursor: pointer; outline: none; color: #1f2937;">
+                  <option value="all">All</option>
+                  <option value="published">✓ Published</option>
+                  <option value="draft">○ Draft</option>
+                </select>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                <label style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Group:</label>
+                <select id="groupFilter" onchange="applyFilters(); renderProducts();" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; font-weight: 500; cursor: pointer; outline: none; color: #1f2937;">
+                  <option value="all">All Groups</option>
+                  <option value="hunting-knives">Hunting Knives</option>
+                  <option value="kitchen-chef-sets">Kitchen/Chef Sets</option>
+                  <option value="pistol-parts">Pistol Parts</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              
+              <!-- Sort Group -->
+              <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border);">
+                <label style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Sort:</label>
+                <select id="sortBy" onchange="loadProducts()" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; font-weight: 500; cursor: pointer; outline: none; color: #1f2937;">
+                  <option value="title">Title</option>
+                  <option value="sku">SKU</option>
+                  <option value="price">Price</option>
+                  <option value="inventory">Inventory</option>
+                  <option value="lastUpdated">Updated</option>
+                </select>
+                <select id="sortOrder" onchange="loadProducts()" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; cursor: pointer; outline: none; color: #1f2937;">
+                  <option value="asc">↑ Asc</option>
+                  <option value="desc">↓ Desc</option>
+                </select>
+              </div>
+              
+              <!-- Page Size Group -->
+              <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); margin-left: auto;">
+                <label style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Show:</label>
+                <select id="pageSize" onchange="changePageSize()" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; font-weight: 500; cursor: pointer; outline: none; color: #1f2937;">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+                <span style="font-size: 12px; color: #9ca3af;">per page</span>
+              </div>
+            </div>
+          </div>
+
           <div id="products-container">
             <div class="empty-state" id="products-empty">
               <div class="empty-state-icon">📦</div>
@@ -773,8 +1041,12 @@
                 <thead>
                   <tr>
                     <th>Image</th>
+                    <th>Item #</th>
                     <th>SKU</th>
                     <th>Title</th>
+                    <th>Group</th>
+                    <th>eBay Cat ID</th>
+                    <th>eBay Category</th>
                     <th>Price</th>
                     <th>Inventory</th>
                     <th>Status</th>
@@ -785,6 +1057,18 @@
                 </tbody>
               </table>
             </div>
+            
+            <!-- Pagination Controls -->
+            <div id="pagination-controls" style="display: none; padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <div style="color: var(--text-secondary); font-size: 13px;">
+                Showing <span id="showing-range">1-10</span> of <span id="total-products">0</span> products
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button id="prev-page" class="btn btn-sm btn-secondary" onclick="changePage(-1)">← Previous</button>
+                <div id="page-numbers" style="display: flex; gap: 4px;"></div>
+                <button id="next-page" class="btn btn-sm btn-secondary" onclick="changePage(1)">Next →</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -794,14 +1078,81 @@
         <div class="page-header">
           <h1 class="page-title">Orders</h1>
           <p class="page-subtitle">Track and manage customer orders</p>
+          <button class="btn btn-primary" onclick="refreshOrders()" style="margin-top: 12px;">
+            🔄 Refresh Orders
+          </button>
         </div>
 
+        <!-- Filters -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-title">Filters</div>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Source</label>
+              <select id="order-source-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+                <option value="ebay">eBay</option>
+                <option value="etsy" disabled>Etsy (Coming Soon)</option>
+                <option value="website" disabled>Website (Coming Soon)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Status</label>
+              <select id="order-status-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+                <option value="">All Statuses</option>
+                <option value="NOT_STARTED">Not Started</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="FULFILLED">Fulfilled</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Limit</label>
+              <select id="order-limit-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200" selected>200</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top: 12px; font-size: 12px; color: var(--text-tertiary);" id="orders-cache-info">
+            
+          </div>
+        </div>
+
+        <!-- Orders Table -->
         <div class="card">
-          <div class="card-title">Recent Orders</div>
-          <div class="empty-state">
+          <div class="card-title">
+            <span id="orders-table-title">Orders</span>
+            <span id="orders-count-badge" style="margin-left: 8px; padding: 2px 8px; background: var(--bg-tertiary); border-radius: 12px; font-size: 12px;"></span>
+          </div>
+          <div id="orders-loading" style="padding: 40px; text-align: center; display: none;">
+            <div>⏳ Loading orders...</div>
+          </div>
+          <div id="orders-error" style="padding: 20px; text-align: center; color: var(--color-danger); display: none;">
+            
+          </div>
+          <div id="orders-empty" class="empty-state">
             <div class="empty-state-icon">🛒</div>
-            <div class="empty-state-title">No orders yet</div>
+            <div class="empty-state-title">No orders found</div>
             <p>Orders will appear here as they come in from your channels</p>
+          </div>
+          <div id="orders-table-container" style="display: none; overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <thead>
+                <tr style="background: var(--bg-secondary); border-bottom: 2px solid var(--border-color);">
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Order ID</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Date</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Buyer</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Items</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Total</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Status</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Payment</th>
+                </tr>
+              </thead>
+              <tbody id="orders-table-body">
+                
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -850,21 +1201,47 @@
       <div id="marketing" class="page">
         <div class="page-header">
           <h1 class="page-title">Marketing Campaigns</h1>
-          <p class="page-subtitle">Create and manage promotions</p>
+          <p class="page-subtitle">Create and manage eBay promotional campaigns</p>
         </div>
 
         <div style="margin-bottom: 24px;">
           <button class="btn btn-primary" onclick="openCampaignModal()">
             ➕ New Campaign
           </button>
+          <button class="btn" onclick="loadCampaigns()" style="margin-left: 8px;">
+            🔄 Refresh
+          </button>
         </div>
 
         <div class="card">
-          <div class="card-title">Active Campaigns</div>
-          <div class="empty-state">
+          <div class="card-title">eBay Ad Campaigns</div>
+          <div id="campaigns-loading" style="text-align: center; padding: 40px; display: none;">
+            <div style="font-size: 32px; margin-bottom: 16px;">⏳</div>
+            <div>Loading campaigns...</div>
+          </div>
+          <div id="campaigns-empty" class="empty-state" style="display: none;">
             <div class="empty-state-icon">📢</div>
             <div class="empty-state-title">No campaigns yet</div>
-            <p>Create your first campaign to promote products</p>
+            <p>Create your first campaign to promote products on eBay</p>
+          </div>
+          <div id="campaigns-table" class="table-container" style="display: none;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campaign Name</th>
+                  <th>Status</th>
+                  <th>Marketplace</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Bid %</th>
+                  <th>Funding Model</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="campaigns-tbody">
+                <!-- Campaigns will be loaded here -->
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1013,47 +1390,110 @@
       <!-- eBay Scraper Page -->
       <div id="scraper" class="page">
         <div class="page-header">
-          <h1 class="page-title">eBay Product Scraper</h1>
-          <p class="page-subtitle">Scrape and import eBay listings into your catalog</p>
+          <h1 class="page-title">eBay Product Scraper & Importer</h1>
+          <p class="page-subtitle">Scrape eBay listings or bulk import with category data</p>
         </div>
 
         <div class="alert alert-info" style="background-color: rgba(14, 165, 233, 0.1); color: #0ea5e9; border: 1px solid rgba(14, 165, 233, 0.3);">
-          ℹ️ Use this tool to scrape eBay listings and automatically add them to your product catalog with enhanced images and metadata.
+          ℹ️ Scraping/import now auto-assigns internal product groups (Hunting Knives, Kitchen/Chef Sets, Pistol Parts, Other). eBay category IDs remain separate for eBay publishing, and WordPress sync excludes Pistol Parts by default.
         </div>
 
-        <div class="card">
-          <div class="card-title">Scrape eBay Listings</div>
-          <form id="scraperForm" onsubmit="handleScraperSubmit(event)">
-            <div class="form-group">
-              <label>eBay Listing URLs or Item Numbers</label>
-              <textarea id="scraperInput" rows="8" placeholder="Paste eBay URLs or item numbers (one per line):&#10;304569312160&#10;https://www.ebay.com/itm/302710852493&#10;304053796929" style="font-family: monospace;"></textarea>
-              <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
-                You can paste full URLs, item numbers, or a mix of both. Each on a new line.
-              </small>
+        <!-- Mode Toggle -->
+        <div class="card" style="padding: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn" id="modeScraperBtn" onclick="setScraperMode('scrape')" style="flex: 1; background: var(--color-primary); color: white;">
+              🔍 Scrape URLs
+            </button>
+            <button type="button" class="btn" id="modeBulkBtn" onclick="setScraperMode('bulk')" style="flex: 1; background: transparent; border: 2px solid var(--color-primary); color: var(--color-primary);">
+              📥 Bulk Import (TSV/CSV)
+            </button>
+          </div>
+        </div>
+
+        <!-- Scrape Mode -->
+        <div id="scrapeMode" style="display: block;">
+          <div class="card">
+            <div class="card-title">Scrape eBay Listings</div>
+            <form id="scraperForm" onsubmit="handleScraperSubmit(event)">
+              <div class="form-group">
+                <label>eBay Listing URLs or Item Numbers</label>
+                <textarea id="scraperInput" rows="8" placeholder="Paste eBay URLs or item numbers (one per line):&#10;304569312160&#10;https://www.ebay.com/itm/302710852493&#10;304053796929" style="font-family: monospace;"></textarea>
+                <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
+                  You can paste full URLs, item numbers, or a mix of both. Each on a new line.
+                </small>
+              </div>
+
+              <div class="form-group">
+                <label>Custom Label (SKU) - Optional</label>
+                <input type="text" id="scraperLabel" placeholder="Optional: Enter a label/SKU for these items (leave empty for auto-generation)">
+                <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
+                  This label will be used to identify the product group in your catalog.
+                </small>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary" id="scraperSubmitBtn">
+                  <span class="spinner" id="scraperSpinner" style="display: none; width: 14px; height: 14px; border-width: 2px;\"></span>
+                  <span id="scraperBtnText">Scrape Listings</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="loadSampleScrapedData()">Load Sample Data</button>
+                <button type="reset" class="btn btn-secondary">Clear</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Bulk Import Mode -->
+        <div id="bulkMode" style="display: none;">
+          <div class="card">
+            <div class="card-title">📥 Bulk Import Products with eBay Categories</div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin-bottom: 16px; border-radius: 4px;">
+              <div style="color: #d32f2f; font-weight: 600; margin-bottom: 8px;">⚠️ CRITICAL: eBay Category IDs Required</div>
+              <div style="font-size: 13px; color: #555; line-height: 1.5;">
+                The eBay category ID is essential for publishing products to eBay. This import method saves category information so it's available when you publish.
+              </div>
             </div>
 
-            <div class="form-group">
-              <label>Custom Label (SKU)</label>
-              <input type="text" id="scraperLabel" placeholder="Optional: Enter a label/SKU for these items (leave empty for auto-generation)">
-              <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
-                This label will be used to identify the product group in your catalog.
-              </small>
-            </div>
+            <form id="bulkImportForm" onsubmit="handleBulkImportSubmit(event)">
+              <div class="form-group">
+                <label>Paste TSV/CSV Data (Tab or Comma Separated)</label>
+                <textarea id="bulkImportInput" rows="10" placeholder="Paste data with headers:&#10;Item number	Link	Custom label (SKU)	Title	Available quantity	Currency	Start price	eBay category 1 name	eBay category 1 number&#10;304569312160	https://www.ebay.com/itm/304569312160	USL	1911 Grips	4	USD	23.28	Pistol Parts	73944" style="font-family: monospace;"></textarea>
+                <small style="color: var(--text-tertiary); margin-top: 6px; display: block;">
+                  Required columns: Item number, Link, SKU, Title, Quantity, Currency, Price, eBay category name, <strong>eBay category ID</strong>
+                </small>
+              </div>
 
-            <div style="display: flex; gap: 8px; margin-top: 16px;">
-              <button type="submit" class="btn btn-primary" id="scraperSubmitBtn">
-                <span class="spinner" id="scraperSpinner" style="display: none; width: 14px; height: 14px; border-width: 2px;\"></span>
-                <span id="scraperBtnText">Scrape Listings</span>
-              </button>
-              <button type="button" class="btn btn-secondary" onclick="loadSampleScrapedData()">Load Sample Data</button>
-              <button type="reset" class="btn btn-secondary">Clear</button>
-            </div>
-          </form>
+              <div style="background: #e8f5e9; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                <div style="color: #2e7d32; font-weight: 600; margin-bottom: 8px;">💡 What Happens:</div>
+                <ul style="font-size: 13px; color: #555; list-style: none; padding-left: 0;">
+                  <li style="padding: 4px 0; padding-left: 20px; position: relative;">
+                    <span style="position: absolute; left: 0;">✓</span> Saves critical data (category ID, price, quantity)
+                  </li>
+                  <li style="padding: 4px 0; padding-left: 20px; position: relative;">
+                    <span style="position: absolute; left: 0;">✓</span> Scrapes missing data (images, descriptions, specifics)
+                  </li>
+                  <li style="padding: 4px 0; padding-left: 20px; position: relative;">
+                    <span style="position: absolute; left: 0;">✓</span> Preserves category ID across future scrapes
+                  </li>
+                </ul>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-top: 16px;">
+                <button type="submit" class="btn btn-primary" id="bulkSubmitBtn">
+                  <span class="spinner" id="bulkSpinner" style="display: none; width: 14px; height: 14px; border-width: 2px;\"></span>
+                  <span id="bulkBtnText">Import & Scrape</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="loadSampleBulkData()">Load Sample Data</button>
+                <button type="reset" class="btn btn-secondary">Clear</button>
+              </div>
+            </form>
+          </div>
         </div>
 
         <div id="scraperResults" style="display: none;">
           <div class="card">
-            <div class="card-title">Scrape Results</div>
+            <div class="card-title">Results</div>
             <div id="resultsContent"></div>
           </div>
         </div>
@@ -1090,38 +1530,193 @@
     </div>
   </div>
 
+  <!-- Edit Product Weight & Dimensions Modal -->
+  <div class="modal" id="editProductDimensionsModal">
+    <div class="modal-content">
+      <div class="modal-header">Edit Weight & Dimensions</div>
+      <form id="editProductDimensionsForm" onsubmit="updateProductDimensions(event)">
+        <input type="hidden" id="editProductId">
+        
+        <!-- Weight Section -->
+        <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 16px; color: var(--text-primary);">Weight</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Value</label>
+              <input type="number" id="editWeightValue" step="0.01" min="0" placeholder="e.g., 2.5" />
+            </div>
+            <div class="form-group">
+              <label>Unit</label>
+              <select id="editWeightUnit">
+                <option value="oz" selected>Ounces (oz)</option>
+                <option value="lb">Pounds (lb)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dimensions Section -->
+        <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 16px; color: var(--text-primary);">Dimensions (in inches)</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Length (in)</label>
+              <input type="number" id="editDimensionsLength" step="0.01" min="0" placeholder="Length" />
+            </div>
+            <div class="form-group">
+              <label>Width (in)</label>
+              <input type="number" id="editDimensionsWidth" step="0.01" min="0" placeholder="Width" />
+            </div>
+            <div class="form-group">
+              <label>Height (in)</label>
+              <input type="number" id="editDimensionsHeight" step="0.01" min="0" placeholder="Height" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Info -->
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--color-info);">
+          <small style="color: var(--text-secondary);">📌 Weight and dimensions are automatically extracted during scraping and will be included in all eBay listings.</small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('editProductDimensionsModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal" id="campaignModal">
     <div class="modal-content">
-      <div class="modal-header">Create Campaign</div>
-      <form id="campaignForm" onsubmit="addCampaign(event)">
+      <div class="modal-header">Create eBay Ad Campaign</div>
+      <form id="campaignForm" onsubmit="createCampaign(event)">
         <div class="form-group">
           <label>Campaign Name</label>
-          <input type="text" required placeholder="E.g., Spring Sale">
+          <input type="text" id="campaignName" required placeholder="e.g., Knife Promotion 2024">
         </div>
         <div class="form-group">
-          <label>Channel</label>
-          <select required>
-            <option>eBay</option>
-            <option>Etsy</option>
-            <option>Social</option>
+          <label>Start Date</label>
+          <input type="datetime-local" id="campaignStartDate" required>
+        </div>
+        <div class="form-group">
+          <label>End Date (Optional)</label>
+          <input type="datetime-local" id="campaignEndDate">
+        </div>
+        <div class="form-group">
+          <label>Bid Percentage (%)</label>
+          <input type="number" id="campaignBidPercentage" step="0.1" required placeholder="5" value="5">
+          <small style="color: var(--text-secondary);">Percentage of item price to bid for ad placement</small>
+        </div>
+        <div class="form-group">
+          <label>Funding Model</label>
+          <select id="campaignFundingModel">
+            <option value="COST_PER_CLICK">Cost Per Click (CPC)</option>
+            <option value="COST_PER_SALE">Cost Per Sale (CPS)</option>
           </select>
-        </div>
-        <div class="form-group">
-          <label>Discount Type</label>
-          <select required>
-            <option>Percentage</option>
-            <option>Fixed Amount</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Discount Value</label>
-          <input type="number" step="0.01" required placeholder="0.00">
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('campaignModal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Create Campaign</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Edit Campaign Modal -->
+  <div class="modal" id="editCampaignModal">
+    <div class="modal-content">
+      <div class="modal-header">Edit Campaign</div>
+      <form id="editCampaignForm" onsubmit="updateCampaign(event)">
+        <input type="hidden" id="editCampaignId">
+        <div class="form-group">
+          <label>Campaign Name</label>
+          <input type="text" id="editCampaignName" required>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="editCampaignStatus">
+            <option value="RUNNING">Active</option>
+            <option value="PAUSED">Paused</option>
+            <option value="ENDED">Ended</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>End Date</label>
+          <input type="datetime-local" id="editCampaignEndDate">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('editCampaignModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background-color: var(--color-primary);">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Product Activity Log Modal -->
+  <div class="modal" id="productActivityLogModal">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <span>Product Activity Log</span>
+        <button type="button" class="btn btn-secondary" onclick="closeModal('productActivityLogModal')" style="margin-left: auto;">✕</button>
+      </div>
+      
+      <div style="padding: 20px;">
+        <!-- Product Info -->
+        <div id="activityLogProductInfo" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+          <strong id="activityLogProductTitle">Loading...</strong>
+        </div>
+
+        <!-- Filters -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <select id="activityLogFilter" onchange="filterActivityLogs()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
+            <option value="">All Actions</option>
+            <option value="PRODUCT_CREATED">Created</option>
+            <option value="PRODUCT_UPDATED">Updated</option>
+            <option value="PRODUCT_SCRAPED_FROM_EBAY">Scraped</option>
+            <option value="PRODUCT_PRICE_UPDATED">Price Changed</option>
+            <option value="PRODUCT_QTY_UPDATED">Inventory Changed</option>
+            <option value="PRODUCT_PUBLISHED_SANDBOX">Published to Sandbox</option>
+            <option value="PRODUCT_PUBLISHED_PRODUCTION">Published to Production</option>
+          </select>
+          
+          <button class="btn btn-secondary" onclick="loadProductActivityLogs(currentActivityLogProductId)">
+            🔄 Refresh
+          </button>
+        </div>
+
+        <!-- Activity Log Table -->
+        <div style="max-height: 500px; overflow-y: auto;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead style="position: sticky; top: 0; background: var(--bg-secondary); z-index: 1;">
+              <tr>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Timestamp</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Action</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Description</th>
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid var(--border-color);">Source</th>
+              </tr>
+            </thead>
+            <tbody id="activityLogTableBody">
+              <tr>
+                <td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">
+                  Loading activity logs...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div id="activityLogPagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+          <div>
+            <span id="activityLogCount">0 activities</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" id="activityLogPrevBtn" onclick="loadActivityLogPage('prev')" disabled>← Previous</button>
+            <button class="btn btn-secondary" id="activityLogNextBtn"onclick="loadActivityLogPage('next')" disabled>Next →</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1145,6 +1740,96 @@
       const theme = saved || 'light';
       document.documentElement.setAttribute('data-theme', theme);
       document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+
+    let runtimeEnvironmentState = {
+      mode: 'stage',
+      serviceTargets: {
+        ebay: 'sandbox'
+      }
+    };
+
+    function getActiveEbayEnvironment() {
+      return runtimeEnvironmentState.serviceTargets?.ebay === 'production' ? 'production' : 'sandbox';
+    }
+
+    function getActivePublishLabel() {
+      return runtimeEnvironmentState.mode === 'prod' ? 'Prod' : 'Stage';
+    }
+
+    function renderRuntimeEnvironmentToggle() {
+      const mode = runtimeEnvironmentState.mode === 'prod' ? 'prod' : 'stage';
+      const ebayTarget = getActiveEbayEnvironment();
+      const switchEl = document.getElementById('runtime-switch');
+      const stageLabel = document.getElementById('runtime-stage-label');
+      const prodLabel = document.getElementById('runtime-prod-label');
+      const ebayPill = document.getElementById('runtime-ebay-pill');
+
+      if (!switchEl || !stageLabel || !prodLabel || !ebayPill) {
+        return;
+      }
+
+      switchEl.setAttribute('data-mode', mode);
+      stageLabel.classList.toggle('active', mode === 'stage');
+      prodLabel.classList.toggle('active', mode === 'prod');
+      ebayPill.textContent = `eBay: ${ebayTarget === 'production' ? 'Production' : 'Sandbox'}`;
+    }
+
+    async function loadRuntimeEnvironment() {
+      try {
+        const response = await fetch('http://localhost:3001/api/runtime/environment');
+        if (!response.ok) {
+          throw new Error('Failed to load runtime environment');
+        }
+        const data = await response.json();
+        runtimeEnvironmentState = {
+          mode: data.mode === 'prod' ? 'prod' : 'stage',
+          serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+        };
+      } catch (error) {
+        console.error('Runtime environment load failed:', error);
+      }
+
+      renderRuntimeEnvironmentToggle();
+    }
+
+    async function toggleRuntimeEnvironment() {
+      const switchEl = document.getElementById('runtime-switch');
+      const nextMode = runtimeEnvironmentState.mode === 'prod' ? 'stage' : 'prod';
+
+      if (switchEl) {
+        switchEl.disabled = true;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3001/api/runtime/environment', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: nextMode })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to switch runtime mode');
+        }
+
+        const data = await response.json();
+        runtimeEnvironmentState = {
+          mode: data.mode === 'prod' ? 'prod' : 'stage',
+          serviceTargets: data.serviceTargets || { ebay: 'sandbox' }
+        };
+        renderRuntimeEnvironmentToggle();
+
+        if (document.getElementById('products')?.classList.contains('active')) {
+          renderProducts();
+        }
+      } catch (error) {
+        console.error('Runtime environment toggle failed:', error);
+        showToast('Failed to switch Stage/Prod mode: ' + error.message, 'error');
+      } finally {
+        if (switchEl) {
+          switchEl.disabled = false;
+        }
+      }
     }
 
     // Page Navigation
@@ -1176,33 +1861,275 @@
       document.getElementById(modalId).classList.remove('active');
     }
 
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add('active');
+    }
+
     // Form Handlers
     function addProduct(e) {
       e.preventDefault();
-      alert('Product creation will be implemented with API integration');
+      showToast('Product creation will be implemented with API integration', 'info');
       closeModal('productModal');
     }
 
-    function addCampaign(e) {
+    // Campaign Management Functions
+    async function loadCampaigns() {
+      const loading = document.getElementById('campaigns-loading');
+      const empty = document.getElementById('campaigns-empty');
+      const table = document.getElementById('campaigns-table');
+      const tbody = document.getElementById('campaigns-tbody');
+
+      loading.style.display = 'block';
+      empty.style.display = 'none';
+      table.style.display = 'none';
+
+      try {
+        const response = await fetch('http://localhost:3001/api/marketing/campaigns');
+        const data = await response.json();
+        
+        loading.style.display = 'none';
+        
+        if (!data.success || !data.campaigns || data.campaigns.length === 0) {
+          empty.style.display = 'block';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.campaigns.forEach(campaign => {
+          const tr = document.createElement('tr');
+          
+          const statusColor = {
+            'RUNNING': '#22c55e',
+            'PAUSED': '#f59e0b',
+            'ENDED': '#94a3b8',
+            'SCHEDULED': '#3b82f6'
+          }[campaign.status] || '#6b7280';
+
+          const statusBadge = `
+            <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: white; background-color: ${statusColor};">
+              ${campaign.status || 'UNKNOWN'}
+            </span>
+          `;
+
+          const formattedStartDate = campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : 'N/A';
+          const formattedEndDate = campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'No end date';
+
+          tr.innerHTML = `
+            <td>${campaign.name || 'Unnamed Campaign'}</td>
+            <td>${statusBadge}</td>
+            <td>${campaign.marketplace || 'EBAY_US'}</td>
+            <td>${formattedStartDate}</td>
+            <td>${formattedEndDate}</td>
+            <td>${campaign.bid_percentage || 'N/A'}%</td>
+            <td>${campaign.funding_model || 'N/A'}</td>
+            <td>
+              ${campaign.status === 'RUNNING' ? `
+                <button class="btn btn-sm" onclick="pauseCampaign('${campaign.id}')" title="Pause">⏸️</button>
+              ` : campaign.status === 'PAUSED' ? `
+                <button class="btn btn-sm" onclick="resumeCampaign('${campaign.id}')" title="Resume">▶️</button>
+              ` : ''}
+              <button class="btn btn-sm" onclick="editCampaign('${campaign.id}')" title="Edit">✏️</button>
+              <button class="btn btn-sm" onclick="deleteCampaign('${campaign.id}')" title="Delete" style="color: var(--color-danger);">🗑️</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        table.style.display = 'block';
+      } catch (error) {
+        console.error('Error loading campaigns:', error);
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+        showToast('Failed to load campaigns: ' + error.message, 'error');
+      }
+    }
+
+    async function createCampaign(e) {
       e.preventDefault();
-      alert('Campaign creation will be implemented with API integration');
-      closeModal('campaignModal');
+      
+      const name = document.getElementById('campaignName').value;
+      const startDate = document.getElementById('campaignStartDate').value;
+      const endDate = document.getElementById('campaignEndDate').value;
+      const bidPercentage = document.getElementById('campaignBidPercentage').value;
+      const fundingModel = document.getElementById('campaignFundingModel').value;
+
+      if (!name || !startDate || !bidPercentage) {
+        showToast('Please fill in all required fields', 'warning');
+        return;
+      }
+
+      try {
+        const response = await fetch('http://localhost:3001/api/marketing/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            startDate: new Date(startDate).toISOString(),
+            endDate: endDate ? new Date(endDate).toISOString() : null,
+            bidPercentage,
+            fundingModel,
+            marketplaceId: 'EBAY_US'
+          })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast(`Campaign "${name}" created successfully!`, 'success');
+          closeModal('campaignModal');
+          document.getElementById('campaignForm').reset();
+          loadCampaigns();
+        } else {
+          showToast('Failed to create campaign: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error creating campaign:', error);
+        showToast('Failed to create campaign: ' + error.message, 'error');
+      }
+    }
+
+    async function editCampaign(campaignId) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/marketing/campaigns/${campaignId}`);
+        const data = await response.json();
+        
+        if (!data.success) {
+          showToast('Failed to load campaign details', 'error');
+          return;
+        }
+
+        const campaign = data.campaign;
+        document.getElementById('editCampaignId').value = campaignId;
+        document.getElementById('editCampaignName').value = campaign.campaignName;
+        document.getElementById('editCampaignStatus').value = campaign.campaignStatus;
+        if (campaign.endDate) {
+          document.getElementById('editCampaignEndDate').value = new Date(campaign.endDate).toISOString().slice(0, 16);
+        }
+
+        document.getElementById('editCampaignModal').classList.add('active');
+      } catch (error) {
+        console.error('Error loading campaign:', error);
+        showToast('Failed to load campaign: ' + error.message, 'error');
+      }
+    }
+
+    async function updateCampaign(e) {
+      e.preventDefault();
+      
+      const campaignId = document.getElementById('editCampaignId').value;
+      const name = document.getElementById('editCampaignName').value;
+      const status = document.getElementById('editCampaignStatus').value;
+      const endDate = document.getElementById('editCampaignEndDate').value;
+
+      try {
+        const response = await fetch(`http://localhost:3001/api/marketing/campaigns/${campaignId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            status,
+            endDate: endDate ? new Date(endDate).toISOString() : null
+          })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('Campaign updated successfully!', 'success');
+          closeModal('editCampaignModal');
+          loadCampaigns();
+        } else {
+          showToast('Failed to update campaign: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error updating campaign:', error);
+        showToast('Failed to update campaign: ' + error.message, 'error');
+      }
+    }
+
+    async function deleteCampaign(campaignId) {
+      if (!await showConfirm('Are you sure you want to delete this campaign? This action cannot be undone.', 'Delete Campaign')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://localhost:3001/api/marketing/campaigns/${campaignId}`, {
+          method: 'DELETE'
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('Campaign deleted successfully!', 'success');
+          loadCampaigns();
+        } else {
+          showToast('Failed to delete campaign: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting campaign:', error);
+        showToast('Failed to delete campaign: ' + error.message, 'error');
+      }
+    }
+
+    async function pauseCampaign(campaignId) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/marketing/campaigns/${campaignId}/pause`, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('Campaign paused successfully!', 'success');
+          loadCampaigns();
+        } else {
+          showToast('Failed to pause campaign: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error pausing campaign:', error);
+        showToast('Failed to pause campaign: ' + error.message, 'error');
+      }
+    }
+
+    async function resumeCampaign(campaignId) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/marketing/campaigns/${campaignId}/resume`, {
+          method: 'POST'
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showToast('Campaign resumed successfully!', 'success');
+          loadCampaigns();
+        } else {
+          showToast('Failed to resume campaign: ' + (result.error || 'Unknown error'), 'error');
+        }
+      } catch (error) {
+        console.error('Error resuming campaign:', error);
+        showToast('Failed to resume campaign: ' + error.message, 'error');
+      }
     }
 
     function saveSettings(e) {
       e.preventDefault();
-      alert('Settings saved!');
+      showToast('Settings saved!', 'success');
     }
 
     function syncInventory() {
-      alert('Syncing inventory across all channels...');
+      showToast('Syncing inventory across all channels...', 'info');
     }
 
     function connectChannel(channel) {
-      alert(`Connecting ${channel}...`);
+      showToast(`Connecting ${channel}...`, 'info');
     }
 
     // Load Products
+    let allProducts = [];
+    let filteredProducts = [];
+    let currentPage = 1;
+    let itemsPerPage = 10;
+
     async function loadProducts() {
       const loading = document.getElementById('products-loading');
       const empty = document.getElementById('products-empty');
@@ -1217,44 +2144,26 @@
         const response = await fetch('http://localhost:3001/api/products');
         if (!response.ok) throw new Error('Failed to load products');
         
-        const products = await response.json();
+        allProducts = await response.json();
         
         loading.style.display = 'none';
         
-        if (products.length === 0) {
+        if (allProducts.length === 0) {
           empty.style.display = 'block';
           return;
         }
 
-        // Render products table
-        tbody.innerHTML = products.map(product => {
-          const firstImage = product.images && product.images.length > 0 ? product.images[0] : '';
-          const imageUrl = firstImage ? `http://localhost:3001/${firstImage}` : '';
-          const price = typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
-          const status = product.publishedLink ? 'Published' : 'Draft';
-          const statusClass = product.publishedLink ? 'badge-success' : 'badge-warning';
-          
-          return `
-            <tr>
-              <td>
-                ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '📦'}
-              </td>
-              <td><strong>${product.sku || 'N/A'}</strong></td>
-              <td style="max-width: 300px;">${product.title || 'Untitled'}</td>
-              <td>${price}</td>
-              <td>${product.inventory || 0}</td>
-              <td><span class="badge ${statusClass}">${status}</span></td>
-              <td>
-                <div style="display: flex; gap: 8px;">
-                  ${product.url ? `<a href="${product.url}" target="_blank" class="btn btn-sm btn-secondary">View</a>` : ''}
-                  ${product.publishedLink ? `<a href="${product.publishedLink}" target="_blank" class="btn btn-sm btn-primary">eBay</a>` : ''}
-                </div>
-              </td>
-            </tr>
-          `;
-        }).join('');
+        // Apply sorting
+        const sortBy = document.getElementById('sortBy').value;
+        const sortOrder = document.getElementById('sortOrder').value;
+        sortProducts(allProducts, sortBy, sortOrder);
+
+        // Apply search and status filters
+        applyFilters();
         
-        table.style.display = 'block';
+        // Render products with pagination
+        renderProducts();
+        
       } catch (error) {
         console.error('Error loading products:', error);
         loading.style.display = 'none';
@@ -1264,6 +2173,1084 @@
       }
     }
 
+    function sortProducts(products, sortBy, sortOrder) {
+      products.sort((a, b) => {
+        let aVal = a[sortBy];
+        let bVal = b[sortBy];
+        
+        // Handle null/undefined
+        if (aVal === null || aVal === undefined) aVal = '';
+        if (bVal === null || bVal === undefined) bVal = '';
+        
+        // Convert to lowercase for string comparison
+        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+        
+        if (sortOrder === 'asc') {
+          return aVal > bVal ? 1 : -1;
+        } else {
+          return aVal < bVal ? 1 : -1;
+        }
+      });
+    }
+
+    function applyFilters() {
+      const searchTerm = document.getElementById('productSearch').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const groupFilter = document.getElementById('groupFilter').value;
+      
+      filteredProducts = allProducts.filter(product => {
+        // Apply search filter
+        const sku = (product.sku || '').toLowerCase();
+        const title = (product.title || '').toLowerCase();
+        const itemNumber = (product.id || '').toLowerCase();
+        const groupLabel = (product.productGroupLabel || product.productGroup || '').toLowerCase();
+        const matchesSearch = !searchTerm || sku.includes(searchTerm) || title.includes(searchTerm) || itemNumber.includes(searchTerm) || groupLabel.includes(searchTerm);
+        
+        // Apply status filter
+        let matchesStatus = true;
+        if (statusFilter === 'published') {
+          matchesStatus = !!product.publishedLink;
+        } else if (statusFilter === 'draft') {
+          matchesStatus = !product.publishedLink;
+        }
+
+        const productGroup = String(product.productGroup || 'other').toLowerCase();
+        const matchesGroup = groupFilter === 'all' || productGroup === groupFilter;
+        
+        return matchesSearch && matchesStatus && matchesGroup;
+      });
+      
+      currentPage = 1; // Reset to first page on filter change
+    }
+
+    function handleProductSearch() {
+      applyFilters();
+      renderProducts();
+    }
+    
+    function changePageSize() {
+      itemsPerPage = parseInt(document.getElementById('pageSize').value);
+      currentPage = 1; // Reset to first page
+      renderProducts();
+    }
+
+    function renderProducts() {
+      const tbody = document.getElementById('products-tbody');
+      const table = document.getElementById('products-table');
+      const paginationControls = document.getElementById('pagination-controls');
+      
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
+      // Render products table
+      tbody.innerHTML = paginatedProducts.map(product => {
+        const firstImage = product.images && product.images.length > 0 ? product.images[0] : '';
+        const imageUrl = firstImage ? `http://localhost:3001/${firstImage}` : '';
+        const price = typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
+        const status = product.publishedLink ? 'Published' : 'Draft';
+        const statusClass = product.publishedLink ? 'badge-success' : 'badge-warning';
+        const productGroup = String(product.productGroup || 'other');
+        const productGroupLabel = product.productGroupLabel || productGroup;
+        const groupBadgeClass = productGroup === 'pistol-parts'
+          ? 'badge-danger'
+          : productGroup === 'hunting-knives'
+            ? 'badge-info'
+            : productGroup === 'kitchen-chef-sets'
+              ? 'badge-primary'
+              : 'badge-warning';
+        const itemNumber = product.id || 'N/A';
+        const productId = product.id || product.url || product.itemNumber;
+        
+        return `
+          <tr id="product-row-${btoa(productId).replace(/=/g, '')}">
+            <td>
+              ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '📦'}
+            </td>
+            <td><strong>${itemNumber}</strong></td>
+            <td><strong>${product.sku || 'N/A'}</strong></td>
+            <td style="max-width: 300px;">${product.title || 'Untitled'}</td>
+            <td><span class="badge ${groupBadgeClass}">${productGroupLabel}</span></td>
+            <td style="font-size: 12px; color: #6b7280;">${product.ebayCategoryId || product.categoryId || '-'}</td>
+            <td style="font-size: 12px; color: #6b7280; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${product.ebayCategory || product.category || 'Not set'}">${product.ebayCategory || product.category || '-'}</td>
+            <td>${price}</td>
+            <td>${product.inventory || product.inventoryQuantity || product.availableQuantity || 0}</td>
+            <td><span class="badge ${statusClass}">${status}</span></td>
+            <td>
+              <div style="display: flex; gap: 4px; flex-wrap: wrap; max-width: 400px;">
+                ${product.url ? `
+                  <button class="btn btn-sm btn-secondary" onclick="window.open('${product.url}', '_blank')" title="View Original eBay Listing">
+                    🔗 eBay
+                  </button>
+                ` : ''}
+                ${product.url ? `
+                  <button class="btn btn-sm btn-secondary" onclick="viewScrapedData('${productId}')" title="View Scraped Data">
+                    📄 Data
+                  </button>
+                ` : ''}
+                ${product.url ? `
+                  <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="rescrapeProduct('${productId}')" title="Re-scrape and Enrich">
+                    🔄 Scrape
+                  </button>
+                ` : ''}
+                ${product.publishedLink || product.sandboxListingId ? `
+                  <button class="btn btn-sm" style="background: #10b981; color: white;" onclick="window.open('${product.publishedLink || `https://www.sandbox.ebay.com/itm/${product.sandboxListingId}`}', '_blank')" title="View on eBay Sandbox">
+                    📦 Sandbox
+                  </button>
+                ` : ''}
+                ${product.productionLink || product.productionListingId ? `
+                  <button class="btn btn-sm" style="background: #059669; color: white;" onclick="window.open('${product.productionLink || `https://www.ebay.com/itm/${product.productionListingId}`}', '_blank')" title="View on eBay Production">
+                    🌐 Prod
+                  </button>
+                ` : ''}
+                <button class="btn btn-sm" style="background: #8b5cf6; color: white;" onclick="openEditProductDimensionsModal('${productId}')" title="Edit Weight & Dimensions">
+                  ⚖️ Dims
+                </button>
+                <button class="btn btn-sm" style="background: #0ea5e9; color: white;" onclick="openProductActivityLog('${productId}', '${product.title?.replace(/'/g, "\\'")}' || 'Product')" title="View Activity Log">
+                  📋 Activity
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="publishProduct('${productId}')" title="Publish using active Stage/Prod mode">
+                  📤 Active (${getActivePublishLabel()})
+                </button>
+                <button class="btn btn-sm" style="background: #6366f1; color: white;" onclick="publishProduct('${productId}', 'sandbox')" title="Force publish to Sandbox">
+                  📦 Force Sandbox
+                </button>
+                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="publishProduct('${productId}', 'production')" title="Force publish to Production">
+                  🌐 Force Prod
+                </button>
+              </div>
+              <div id="status-${btoa(productId).replace(/=/g, '')}" style="display: none; margin-top: 8px; padding: 8px; border-radius: 4px; font-size: 12px;"></div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      
+      table.style.display = 'block';
+      
+      // Update pagination
+      updatePagination();
+    }
+
+    function updatePagination() {
+      const paginationControls = document.getElementById('pagination-controls');
+      const showingRange = document.getElementById('showing-range');
+      const totalProductsSpan = document.getElementById('total-products');
+      const pageNumbers = document.getElementById('page-numbers');
+      const prevBtn = document.getElementById('prev-page');
+      const nextBtn = document.getElementById('next-page');
+      
+      const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+      const startIndex = (currentPage - 1) * itemsPerPage + 1;
+      const endIndex = Math.min(currentPage * itemsPerPage, filteredProducts.length);
+      
+      showingRange.textContent = `${startIndex}-${endIndex}`;
+      totalProductsSpan.textContent = filteredProducts.length;
+      
+      // Show/hide pagination controls
+      if (totalPages > 1) {
+        paginationControls.style.display = 'flex';
+      } else {
+        paginationControls.style.display = 'none';
+      }
+      
+      // Enable/disable buttons
+      prevBtn.disabled = currentPage === 1;
+      nextBtn.disabled = currentPage === totalPages;
+      
+      // Render page numbers
+      pageNumbers.innerHTML = '';
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+          const btn = document.createElement('button');
+          btn.textContent = i;
+          btn.className = i === currentPage ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-secondary';
+          btn.onclick = () => goToPage(i);
+          pageNumbers.appendChild(btn);
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+          const span = document.createElement('span');
+          span.textContent = '...';
+          span.style.padding = '0 8px';
+          pageNumbers.appendChild(span);
+        }
+      }
+    }
+
+    function changePage(delta) {
+      currentPage += delta;
+      renderProducts();
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderProducts();
+    }
+
+    // Edit Product
+    async function editProduct(productId) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/products/${productId}`);
+        if (!response.ok) throw new Error('Failed to load product');
+        const product = await response.json();
+        
+        const newTitle = prompt('Edit Title:', product.title || '');
+        if (newTitle === null) return; // Cancelled
+        
+        const newPrice = prompt('Edit Price:', product.price || '');
+        if (newPrice === null) return; // Cancelled
+        
+        const newInventory = prompt('Edit Inventory:', product.inventory || 0);
+        if (newInventory === null) return; // Cancelled
+        
+        const updateResponse = await fetch(`http://localhost:3001/api/products/${productId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: newTitle,
+            price: parseFloat(newPrice) || 0,
+            inventory: parseInt(newInventory) || 0
+          })
+        });
+        
+        if (!updateResponse.ok) throw new Error('Failed to update product');
+        
+        showToast('Product updated successfully!', 'success');
+        loadProducts();
+      } catch (error) {
+        console.error('Error updating product:', error);
+        showToast('Failed to update product: ' + error.message, 'error');
+      }
+    }
+
+    // Open Edit Product Dimensions Modal
+    async function openEditProductDimensionsModal(productId) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/products/${productId}`);
+        if (!response.ok) throw new Error('Failed to load product');
+        const data = await response.json();
+        const product = data.product || data;
+        
+        // Parse weight
+        let weightValue = '';
+        let weightUnit = 'oz';
+        if (product.weight) {
+          weightValue = product.weight;
+          // Try to detect unit from stored data
+          if (product.weightUnit) {
+            weightUnit = product.weightUnit;
+          }
+        }
+        
+        // Parse dimensions
+        let length = '';
+        let width = '';
+        let height = '';
+        if (product.dimensions) {
+          let dims = product.dimensions;
+          if (typeof dims === 'string') {
+            try {
+              dims = JSON.parse(dims);
+            } catch (e) {
+              console.warn('Could not parse dimensions JSON');
+            }
+          }
+          if (dims && typeof dims === 'object') {
+            length = dims.length || '';
+            width = dims.width || '';
+            height = dims.height || '';
+          }
+        }
+        
+        // Set form values
+        document.getElementById('editProductId').value = productId;
+        document.getElementById('editWeightValue').value = weightValue;
+        document.getElementById('editWeightUnit').value = weightUnit;
+        document.getElementById('editDimensionsLength').value = length;
+        document.getElementById('editDimensionsWidth').value = width;
+        document.getElementById('editDimensionsHeight').value = height;
+        
+        openModal('editProductDimensionsModal');
+      } catch (error) {
+        console.error('Error loading product:', error);
+        showToast('Failed to load product: ' + error.message, 'error');
+      }
+    }
+
+    // Update Product Dimensions
+    async function updateProductDimensions(event) {
+      event.preventDefault();
+      
+      try {
+        const productId = document.getElementById('editProductId').value;
+        const weightValue = parseFloat(document.getElementById('editWeightValue').value) || null;
+        const weightUnit = document.getElementById('editWeightUnit').value;
+        const length = parseFloat(document.getElementById('editDimensionsLength').value) || 0;
+        const width = parseFloat(document.getElementById('editDimensionsWidth').value) || 0;
+        const height = parseFloat(document.getElementById('editDimensionsHeight').value) || 0;
+        
+        const updateData = {
+          weight: weightValue,
+          weightUnit: weightValue ? weightUnit : null,
+          dimensions: {
+            length: length,
+            width: width,
+            height: height,
+            unit: 'in'
+          }
+        };
+        
+        const response = await fetch(`http://localhost:3001/api/products/${productId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) throw new Error('Failed to update product');
+        
+        closeModal('editProductDimensionsModal');
+        showToast('Weight & Dimensions updated successfully!', 'success');
+        loadProducts();
+      } catch (error) {
+        console.error('Error updating product:', error);
+        showToast('Failed to update product: ' + error.message, 'error');
+      }
+    }
+
+    // Product Activity Log Variables
+    let currentActivityLogProductId = null;
+    let activityLogCurrentPage = 1;
+    let activityLogPageSize = 20;
+    let activityLogTotalCount = 0;
+
+    // Open Product Activity Log Modal
+    async function openProductActivityLog(productId, productTitle) {
+      currentActivityLogProductId = productId;
+      activityLogCurrentPage = 1;
+      
+      // Set product info
+      document.getElementById('activityLogProductTitle').textContent = productTitle;
+      
+      // Reset filter
+      document.getElementById('activityLogFilter').value = '';
+      
+      // Open modal
+      openModal('productActivityLogModal');
+      
+      // Load logs
+      await loadProductActivityLogs(productId);
+    }
+
+    // Load Product Activity Logs
+    async function loadProductActivityLogs(productId, page = 1) {
+      try {
+        const filter = document.getElementById('activityLogFilter').value;
+        const params = new URLSearchParams({
+          page: page,
+          limit: activityLogPageSize
+        });
+        
+        if (filter) {
+          params.append('actionType', filter);
+        }
+        
+        const response = await fetch(`http://localhost:3001/api/products/${productId}/activity-logs?${params}`);
+        
+        if (!response.ok) throw new Error('Failed to load activity logs');
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          activityLogCurrentPage = page;
+          activityLogTotalCount = result.totalCount;
+          renderActivityLogs(result.logs || []);
+          updateActivityLogPagination(result.totalCount, result.hasMore);
+        }
+      } catch (error) {
+        console.error('Error loading activity logs:', error);
+        document.getElementById('activityLogTableBody').innerHTML = 
+          '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">Failed to load activity logs</td></tr>';
+      }
+    }
+
+    // Render Activity Logs
+    function renderActivityLogs(logs) {
+      const tbody = document.getElementById('activityLogTableBody');
+      
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding: 40px; text-align: center; color: var(--text-secondary);">No activity logs found</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = logs.map(log => {
+        const timestamp = new Date(log.createdAt).toLocaleString();
+        const actionBadge = getActionBadge(log.actionType);
+        const description = log.actionDescription || '-';
+        const source = log.sourceSystem || 'System';
+        
+        return `
+          <tr style="border-bottom: 1px solid var(--border-color);">
+            <td style="padding: 12px; white-space: nowrap;">${timestamp}</td>
+            <td style="padding: 12px;">${actionBadge}</td>
+            <td style="padding: 12px;">${description}</td>
+            <td style="padding: 12px;">${source}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Get Action Badge
+    function getActionBadge(actionType) {
+      const badges = {
+        'PRODUCT_CREATED': '🆕 Created',
+        'PRODUCT_UPDATED': '📝 Updated',
+        'PRODUCT_SCRAPED_FROM_EBAY': '🔄 Scraped',
+        'PRODUCT_PRICE_UPDATED': '💰 Price Changed',
+        'PRODUCT_TITLE_UPDATED': '📋 Title Changed',
+        'PRODUCT_QTY_UPDATED': '📦 Inventory Changed',
+        'PRODUCT_IMAGES_UPDATED': '🖼️ Images Updated',
+        'PRODUCT_WEIGHT_UPDATED': '⚖️ Weight Updated',
+        'PRODUCT_DIMENSIONS_UPDATED': '📐 Dimensions Updated',
+        'PRODUCT_PUBLISHED_SANDBOX': '🧪 Published to Sandbox',
+        'PRODUCT_PUBLISHED_PRODUCTION': '🚀 Published to Production',
+        'PRODUCT_LISTING_UPDATED': '🔄 Listing Updated',
+        'PRODUCT_MARKED_INACTIVE': '🔴 Marked Inactive',
+        'PRODUCT_MARKED_ACTIVE': '🟢 Marked Active',
+        'PRODUCT_DELETED': '🗑️ Deleted'
+      };
+      
+      return badges[actionType] || actionType;
+    }
+
+    // Update Activity Log Pagination
+    function updateActivityLogPagination(totalCount, hasMore) {
+      document.getElementById('activityLogCount').textContent = `${totalCount} activities`;
+      
+      const prevBtn = document.getElementById('activityLogPrevBtn');
+      const nextBtn = document.getElementById('activityLogNextBtn');
+      
+      prevBtn.disabled = activityLogCurrentPage === 1;
+      nextBtn.disabled = !hasMore;
+    }
+
+    // Load Activity Log Page
+    function loadActivityLogPage(direction) {
+      const newPage = direction === 'next' ? activityLogCurrentPage + 1 : activityLogCurrentPage - 1;
+      if (newPage < 1) return;
+      
+      loadProductActivityLogs(currentActivityLogProductId, newPage);
+    }
+
+    // Filter Activity Logs
+    function filterActivityLogs() {
+      activityLogCurrentPage = 1;
+      loadProductActivityLogs(currentActivityLogProductId, 1);
+    }
+
+    // Delete Product
+    async function deleteProduct(productId, productUrl) {
+      if (!await showConfirm('Are you sure you want to delete this product? This action cannot be undone.', 'Delete Product')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`http://localhost:3001/api/products/${encodeURIComponent(productUrl)}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Failed to delete product');
+        
+        showToast('Product deleted successfully!', 'success');
+        loadProducts();
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        showToast('Failed to delete product: ' + error.message, 'error');
+      }
+    }
+
+    // Publish to eBay Sandbox
+    async function publishToEbaySandbox(productId, productUrl) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '⏳';
+      
+      console.log('=== Publishing to eBay Sandbox (Real API Integration) ===');
+      console.log('Product URL:', productUrl);
+      console.log('Product ID:', productId);
+      console.log('Target: Platform Backend → Express Server → eBay API');
+      
+      try {
+        console.log('Step 1: Sending listing creation request...');
+        const response = await fetch('http://localhost:4000/api/platform/integrations/ebay/listings/sandbox', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ productUrl, productId })
+        });
+        
+        const result = await response.json();
+        console.log('Step 2: Received response from backend:', result);
+        
+        if (!response.ok) {
+          console.error('API Error:', response.status);
+          console.error('Error details:', result);
+          throw new Error(result.error || result.message || 'Failed to publish');
+        }
+        
+        if (result.listingId) {
+          console.log('✓ Listing created successfully!');
+          console.log('Listing ID:', result.listingId);
+          console.log('Published Link:', result.publishedLink);
+          console.log('Mode:', result.mode);
+          
+          if (result.mode === 'sandbox-real') {
+            console.log('✓ This is a REAL eBay Sandbox listing');
+            console.log('✓ You can find it at:', result.publishedLink);
+            console.log('✓ Click the link above to view on eBay Sandbox');
+          } else if (result.mode === 'sandbox-mock') {
+            console.warn('⚠️ WARNING: This is a SIMULATED listing (no API credentials)');
+          }
+        }
+        
+        // Check for warnings
+        if (result.warning) {
+          console.warn('⚠️ Note:', result.warning);
+        }
+        
+        // Show success toast
+        const modeText = result.mode === 'sandbox-real' ? '✓ REAL EBAY SANDBOX' : '⚠️ SIMULATED';
+        const message = `${modeText}<br><br>${result.message}<br><br>Listing ID: ${result.listingId}<br>Check console for details`;
+        showToast(message, 'success', 8000);
+        
+        // Successfully published
+        console.log('=== Publish Process Complete ===');
+        loadProducts();
+      } catch (error) {
+        console.error('=== Publish Error ===');
+        console.error('Error publishing to eBay:', error);
+        showToast('Failed to publish to eBay Sandbox: ' + error.message + '<br><br>Make sure both servers are running:<br>• Express on port 3001<br>• Platform on port 4000', 'error', 10000);
+        btn.disabled = false;
+        btn.textContent = '📤';
+      }
+    }
+
+    // Set Inventory Default (Only for Zero Stock Items)
+    async function setInventoryDefault(event) {
+      const input = document.getElementById('inventoryDefaultInput');
+      const inventoryValue = parseInt(input.value);
+      
+      if (isNaN(inventoryValue) || inventoryValue < 0) {
+        showToast('Please enter a valid non-negative number', 'warning');
+        return;
+      }
+      
+      if (!await showConfirm(`Set inventory to ${inventoryValue} for all products with ZERO stock?\n\n(Products with existing inventory will not be changed)`, 'Apply Inventory to Zero Stock')) {
+        return;
+      }
+      
+      try {
+        // Show loading state
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Updating...';
+        
+        const response = await fetch('http://localhost:3001/api/products/bulk/set-inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            inventory: inventoryValue,
+            onlyZero: true 
+          })
+        });
+        
+        if (!response.ok) throw new Error('Failed to update inventory');
+        
+        const result = await response.json();
+        
+        // Show detailed results
+        let message = `✓ Inventory Update Complete!<br><br>`;
+        message += `• Updated: ${result.updated} products (set to ${inventoryValue})<br>`;
+        message += `• Skipped: ${result.skipped} products (already had stock)<br>`;
+        message += `• Mode: Only zero-stock products`;
+        
+        showToast(message, 'success', 7000);
+        loadProducts();
+        
+        // Restore button
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      } catch (error) {
+        console.error('Error updating inventory:', error);
+        showToast('Failed to update inventory: ' + error.message, 'error');
+        
+        // Restore button
+        const btn = event.target;
+        btn.disabled = false;
+        btn.innerHTML = '📦 Apply to Zero Stock';
+      }
+    }
+
+    // View Scraped Data
+    function viewScrapedData(productId) {
+      // Open product detail page in a new tab
+      window.open(`/product-detail.html?id=${encodeURIComponent(productId)}`, '_blank', 'width=1200,height=800');
+    }
+
+    // Re-scrape Product
+    async function rescrapeProduct(productId) {
+      const statusId = 'status-' + btoa(productId).replace(/=/g, '');
+      const statusEl = document.getElementById(statusId);
+      
+      try {
+        showStatus(statusId, 'loading', '🔄 Re-scraping product...');
+        
+        const response = await fetch(`http://localhost:3001/api/products/${encodeURIComponent(productId)}/rescrape`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+          let errMsg = 'Failed to start re-scrape';
+          try {
+            const errData = await response.json();
+            errMsg = errData.error || errData.message || errMsg;
+          } catch (_) {
+            // Keep fallback error message when response is not JSON
+          }
+          throw new Error(errMsg);
+        }
+        
+        const result = await response.json();
+        showStatus(statusId, 'success', `✓ Re-scrape started! Job ID: ${result.jobId}`);
+        
+        // Poll for completion
+        let attempts = 0;
+        const checkInterval = setInterval(async () => {
+          attempts++;
+          try {
+            const jobResponse = await fetch(`http://localhost:3001/scrape/job/${result.jobId}`);
+            const jobData = await jobResponse.json();
+            
+            if (jobData.job.status === 'completed') {
+              clearInterval(checkInterval);
+              showStatus(statusId, 'success', '✓ Product re-scraped successfully!');
+              setTimeout(() => loadProducts(), 1000);
+            } else if (jobData.job.status === 'failed') {
+              clearInterval(checkInterval);
+              showStatus(statusId, 'error', '✗ Re-scrape failed: ' + (jobData.job.error || 'Unknown error'));
+            } else if (attempts > 30) {
+              clearInterval(checkInterval);
+              showStatus(statusId, 'warning', '⏱ Re-scrape taking longer than expected...');
+            }
+          } catch (e) {
+            console.error('Poll error:', e);
+          }
+        }, 2000);
+      } catch (error) {
+        console.error('Error re-scraping:', error);
+        const isNetworkError = error.message && (
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('NetworkError')
+        );
+        const displayMessage = isNetworkError
+          ? '✗ Failed: API server is not running on port 3001'
+          : ('✗ Failed: ' + error.message);
+        showStatus(statusId, 'error', displayMessage);
+      }
+    }
+
+    // Publish Product (active Stage/Prod mode or explicit environment)
+    async function publishProduct(productId, environment) {
+      const statusId = 'status-' + btoa(productId).replace(/=/g, '');
+      const resolvedEnvironment = environment || getActiveEbayEnvironment();
+      const envLabel = resolvedEnvironment === 'sandbox' ? 'Sandbox' : 'Production';
+      const usingActiveMode = !environment;
+      const modeLabel = runtimeEnvironmentState.mode === 'prod' ? 'Prod' : 'Stage';
+      
+      const confirmMessage = `Publish this product to eBay ${envLabel}${usingActiveMode ? ` (${modeLabel} mode)` : ''}?<br><br>${resolvedEnvironment === 'production' ? '⚠️ <strong>WARNING: This will publish to LIVE eBay!</strong><br><br>' : ''}Continue?`;
+      if (!await showConfirm(confirmMessage, 'Publish to eBay')) {
+        return;
+      }
+      
+      try {
+        showStatus(statusId, 'loading', `🚀 Publishing to ${envLabel}...`);
+
+        const endpoint = usingActiveMode
+          ? `http://localhost:3001/api/products/${encodeURIComponent(productId)}/publish/active`
+          : `http://localhost:3001/api/products/${encodeURIComponent(productId)}/publish/${resolvedEnvironment}`;
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to publish');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          const listingLink = result.listingLink || result.link;
+          showStatus(statusId, 'success', `✓ Published to ${envLabel}! <a href="${listingLink}" target="_blank" style="color: white; text-decoration: underline;">View Listing</a>`);
+          setTimeout(() => loadProducts(), 1500);
+        } else {
+          showStatus(statusId, 'error', `✗ Failed: ${result.error || result.message}`);
+        }
+      } catch (error) {
+        console.error(`Error publishing to ${resolvedEnvironment}:`, error);
+        showStatus(statusId, 'error', '✗ Failed: ' + error.message);
+      }
+    }
+
+    // Show Status Helper
+    function showStatus(statusId, type, message) {
+      const statusEl = document.getElementById(statusId);
+      if (!statusEl) return;
+      
+      const colors = {
+        loading: 'background: #3b82f6; color: white;',
+        success: 'background: #10b981; color: white;',
+        error: 'background: #ef4444; color: white;',
+        warning: 'background: #f59e0b; color: white;'
+      };
+      
+      statusEl.style.cssText = colors[type] || colors.loading;
+      statusEl.innerHTML = message;
+      statusEl.style.display = 'block';
+      
+      // Auto-hide after 10 seconds for non-loading messages
+      if (type !== 'loading') {
+        setTimeout(() => {
+          statusEl.style.display = 'none';
+        }, 10000);
+      }
+    }
+
+    // Cleanup All Titles and Descriptions with SEO Optimization
+    async function cleanupAllTitles() {
+      if (!await showConfirm('This will perform comprehensive SEO cleanup:<br><br>✓ Remove brand keywords ("Shard Blade", "-Blade", etc.)<br>✓ Optimize titles for search engines<br>✓ Clean up descriptions<br>✓ Generate SEO keywords<br>✓ Apply professional formatting<br><br>Continue?', 'SEO Cleanup')) {
+        return;
+      }
+      
+      try {
+        // Show loading state
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Processing...';
+        
+        const response = await fetch('http://localhost:3001/api/products/bulk/cleanup-titles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) throw new Error('Failed to cleanup');
+        
+        const result = await response.json();
+        
+        // Show detailed results with samples
+        let message = `✓ SEO Cleanup Complete!<br><br>`;
+        message += `• Total Products: ${result.total}<br>`;
+        message += `• Updated: ${result.updated}<br>`;
+        message += `• Unchanged: ${result.total - result.updated}<br><br>`;
+        
+        if (result.sample && result.sample.length > 0) {
+          message += `Sample Changes:<br>`;
+          result.sample.slice(0, 3).forEach((item, idx) => {
+            message += `<br>${idx + 1}. Before: "${item.oldTitle}"<br>`;
+            message += `   After:  "${item.newTitle}"<br>`;
+            if (item.keywords && item.keywords.length > 0) {
+              message += `   Keywords: ${item.keywords.join(', ')}<br>`;
+            }
+          });
+        }
+        
+        showToast(message, 'success', 10000);
+        loadProducts();
+        
+        // Restore button
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      } catch (error) {
+        console.error('Error cleaning up:', error);
+        showToast('Failed to cleanup: ' + error.message, 'error');
+        
+        // Restore button
+        const btn = event.target;
+        btn.disabled = false;
+        btn.innerHTML = '✨ SEO Cleanup All';
+      }
+    }
+
+    // ============================================================================
+    // CORE FEATURES: Smart Bulk Operations
+    // ============================================================================
+
+    let bulkOperationJobId = null;
+    let bulkOperationPollInterval = null;
+
+    // Start Smart Bulk Scrape
+    async function startSmartBulkScrape() {
+      try {
+        const confirmMessage = '🔄 Smart Bulk Scrape<br><br>' +
+          'This will scrape all products that haven\'t been updated in the last 24 hours.<br><br>' +
+          '• Only products needing updates will be scraped<br>' +
+          '• Data will be updated only if changes are detected<br>' +
+          '• Progress will be tracked in real-time<br><br>' +
+          'Continue?';
+        
+        if (!await showConfirm(confirmMessage, 'Smart Bulk Scrape')) return;
+        
+        // Show progress card
+        document.getElementById('bulkOperationProgress').style.display = 'block';
+        document.getElementById('bulkOpTitle').textContent = '🔄 Smart Bulk Scrape';
+        document.getElementById('bulkOpSubtitle').textContent = 'Initializing scrape job...';
+        document.getElementById('bulkOpChangesCard').style.display = 'block';
+        document.getElementById('bulkOpUnchangedCard').style.display = 'block';
+        
+        // Start job
+        const response = await fetch('/api/products/scrape-all', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        
+        if (!response.ok) throw new Error('Failed to start scrape job');
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to start scrape job');
+        }
+        
+        if (result.totalProducts === 0) {
+          showToast(result.message || 'All products are up to date!', 'info');
+          document.getElementById('bulkOperationProgress').style.display = 'none';
+          return;
+        }
+        
+        bulkOperationJobId = result.jobId;
+        document.getElementById('bulkOpSubtitle').textContent = `Scraping ${result.totalProducts} products...`;
+        
+        // Start polling
+        startBulkOperationPolling('scrape');
+        
+      } catch (error) {
+        console.error('Error starting bulk scrape:', error);
+        showToast('Failed to start bulk scrape: ' + error.message, 'error');
+        document.getElementById('bulkOperationProgress').style.display = 'none';
+      }
+    }
+
+    // Start Bulk Upload to eBay
+    async function startBulkUploadToEbay() {
+      try {
+        // Get current environment
+        const envResponse = await fetch('/api/runtime/environment');
+        const envData = await envResponse.json();
+        const environment = envData.serviceTargets?.ebay || 'sandbox';
+        const isProduction = environment === 'production';
+        
+        const confirmMessage = '🚀 Bulk Upload to eBay<br><br>' +
+          `Target Environment: <strong>${environment.toUpperCase()}</strong><br><br>` +
+          'This will publish all unpublished products to eBay.<br><br>' +
+          '• Only products not yet on eBay will be uploaded<br>' +
+          '• Each product will be validated before publishing<br>' +
+          '• Progress will be tracked in real-time<br>' +
+          (isProduction ? '<br>⚠️ <strong>WARNING: This will create LIVE listings!</strong><br>' : '<br>✓ Sandbox mode - safe for testing<br>') +
+          '<br>Continue?';
+        
+        if (!await showConfirm(confirmMessage, 'Bulk Upload to eBay')) return;
+        
+        // Show progress card
+        document.getElementById('bulkOperationProgress').style.display = 'block';
+        document.getElementById('bulkOpTitle').textContent = '🚀 Bulk Upload to eBay';
+        document.getElementById('bulkOpSubtitle').textContent = 'Initializing upload job...';
+        document.getElementById('bulkOpChangesCard').style.display = 'none';
+        document.getElementById('bulkOpUnchangedCard').style.display = 'none';
+        
+        // Start job
+        const response = await fetch('/api/products/publish-all-to-ebay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            environment: environment,
+            dryRun: false 
+          })
+        });
+        
+        if (!response.ok) throw new Error('Failed to start upload job');
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to start upload job');
+        }
+        
+        if (result.totalProducts === 0) {
+          showToast(result.message || 'No products to upload!', 'info');
+          document.getElementById('bulkOperationProgress').style.display = 'none';
+          return;
+        }
+        
+        bulkOperationJobId = result.jobId;
+        document.getElementById('bulkOpSubtitle').textContent = 
+          `Uploading ${result.totalProducts} products to ${environment}...`;
+        
+        // Start polling
+        startBulkOperationPolling('publish');
+        
+      } catch (error) {
+        console.error('Error starting bulk upload:', error);
+        showToast('Failed to start bulk upload: ' + error.message, 'error');
+        document.getElementById('bulkOperationProgress').style.display = 'none';
+      }
+    }
+
+    // Start polling for job status
+    function startBulkOperationPolling(operationType) {
+      if (bulkOperationPollInterval) {
+        clearInterval(bulkOperationPollInterval);
+      }
+      
+      const endpoint = operationType === 'scrape' 
+        ? '/api/products/scrape-all/' 
+        : '/api/products/publish-all-to-ebay/';
+      
+      bulkOperationPollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(endpoint + bulkOperationJobId);
+          const result = await response.json();
+          
+          if (result.success && result.job) {
+            updateBulkOperationProgress(result.job, operationType);
+            
+            // Stop polling if job is complete
+            if (result.job.status === 'completed' || result.job.status === 'failed') {
+              clearInterval(bulkOperationPollInterval);
+              bulkOperationPollInterval = null;
+              
+              // Show completion notification
+              if (result.job.status === 'completed') {
+                setTimeout(() => {
+                  const message = `✓ ${operationType === 'scrape' ? 'Scrape' : 'Upload'} Complete!<br><br>` +
+                    `Processed: ${result.job.processedCount}<br>` +
+                    `Success: ${result.job.successCount}<br>` +
+                    `Failures: ${result.job.failureCount}` +
+                    (operationType === 'scrape' ? `<br>Updated: ${result.job.updatedCount}<br>Unchanged: ${result.job.unchangedCount}` : '');
+                  
+                  showToast(message, 'success', 8000);
+                  
+                  // Reload products
+                  loadProducts();
+                }, 500);
+              } else {
+                showToast(`✗ Operation failed: ${result.job.error || 'Unknown error'}`, 'error');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error polling job status:', error);
+        }
+      }, 2000); // Poll every 2 seconds
+    }
+
+    // Update bulk operation progress UI
+    function updateBulkOperationProgress(job, operationType) {
+      // Progress percentage
+      const progressPercent = parseFloat(job.progress || '0');
+      document.getElementById('bulkOpProgress').textContent = job.progress;
+      document.getElementById('bulkOpProgressBar').style.width = job.progress;
+      
+      // Processed count
+      document.getElementById('bulkOpProcessed').textContent = 
+        `${job.processedCount} / ${job.totalProducts}`;
+      
+      // Success and failures
+      document.getElementById('bulkOpSuccess').textContent = job.successCount;
+      document.getElementById('bulkOpFailures').textContent = job.failureCount;
+      
+      // Scrape-specific stats
+      if (operationType === 'scrape') {
+        document.getElementById('bulkOpUpdated').textContent = job.updatedCount || 0;
+        document.getElementById('bulkOpUnchanged').textContent = job.unchangedCount || 0;
+      }
+      
+      // Status
+      const statusText = job.status.charAt(0).toUpperCase() + job.status.slice(1);
+      document.getElementById('bulkOpStatus').textContent = statusText;
+      
+      if (job.status === 'completed') {
+        document.getElementById('bulkOpStatus').style.color = '#10b981';
+      } else if (job.status === 'failed') {
+        document.getElementById('bulkOpStatus').style.color = '#ef4444';
+      }
+      
+      // ETA
+      if (job.estimatedTimeRemaining) {
+        document.getElementById('bulkOpETA').textContent = `ETA: ${job.estimatedTimeRemaining}`;
+      }
+      
+      // Recent activity
+      updateBulkOperationActivityLog(job, operationType);
+    }
+
+    // Update activity log
+    function updateBulkOperationActivityLog(job, operationType) {
+      const activityLog = document.getElementById('bulkOpActivityLog');
+      const activities = [];
+      
+      // Add recent successful results
+      if (job.recentResults && job.recentResults.length > 0) {
+        job.recentResults.slice(-5).forEach(result => {
+          if (operationType === 'scrape') {
+            const icon = result.hasChanges ? '🔄' : '✓';
+            const text = result.hasChanges 
+              ? `${icon} Updated: ${result.sku} (${result.changeCount} changes)`
+              : `${icon} No changes: ${result.sku}`;
+            activities.push(`<div style="color: ${result.hasChanges ? '#f59e0b' : '#10b981'}; margin-bottom: 4px;">${text}</div>`);
+          } else {
+            activities.push(`<div style="color: #10b981; margin-bottom: 4px;">✓ Published: ${result.sku}${result.listingId ? ' → ' + result.listingId : ''}</div>`);
+          }
+        });
+      }
+      
+      // Add recent errors
+      if (job.recentErrors && job.recentErrors.length > 0) {
+        job.recentErrors.slice(-3).forEach(error => {
+          activities.push(`<div style="color: #ef4444; margin-bottom: 4px;">✗ Failed: ${error.sku || error.link} - ${error.error}</div>`);
+        });
+      }
+      
+      if (activities.length === 0) {
+        activities.push('<div style="color: #9ca3af;">No activity yet...</div>');
+      }
+      
+      activityLog.innerHTML = activities.reverse().join('');
+    }
+
+    // Close bulk progress
+    async function closeBulkProgress() {
+      if (bulkOperationPollInterval) {
+        if (!await showConfirm('Operation is still running. Are you sure you want to close this panel?', 'Close Progress Panel')) {
+          return;
+        }
+        
+        clearInterval(bulkOperationPollInterval);
+        bulkOperationPollInterval = null;
+      }
+      
+      document.getElementById('bulkOperationProgress').style.display = 'none';
+      bulkOperationJobId = null;
+    }
+
+    // ============================================================================
+    // END CORE FEATURES
+    // ============================================================================
+
     // Load Page Data
     async function loadPageData(pageId) {
       try {
@@ -1271,6 +3258,10 @@
           updateDashboardStats();
         } else if (pageId === 'products') {
           loadProducts();
+        } else if (pageId === 'marketing') {
+          loadCampaigns();
+        } else if (pageId === 'orders') {
+          loadOrders();
         }
       } catch (e) {
         console.error('Failed to load page data:', e);
@@ -1283,14 +3274,31 @@
         if (response.ok) {
           const products = await response.json();
           document.getElementById('stat-products').textContent = products.length;
-          const published = products.filter(p => p.publishedLink).length;
-          document.getElementById('stat-inventory').textContent = products.reduce((sum, p) => sum + (p.inventory || 0), 0);
+          // Count products ready for eBay with active inventory:
+          // - Have valid ID (itemNumber from eBay)
+          // - Have title, price, description
+          // - Have valid category (not "N/A")
+          // - Have images
+          // - Have inventory > 0
+          const activeOnEbay = products.filter(p => 
+            p.id && p.id !== 'unknown' &&
+            p.title && p.price && p.description &&
+            p.ebayCategoryId && p.ebayCategoryId !== 'N/A' &&
+            p.images && p.images.length > 0 &&
+            p.inventory > 0
+          ).length;
+          document.getElementById('stat-inventory').textContent = activeOnEbay;
         }
       } catch (e) {
         console.error('Failed to load stats:', e);
       }
       document.getElementById('stat-orders').textContent = '0';
       document.getElementById('stat-channels').textContent = '4';
+    }
+
+    function getScrapedDetailsUrl(productUrl) {
+      if (!productUrl) return '';
+      return `http://localhost:3001/product-details.html?link=${encodeURIComponent(productUrl)}`;
     }
 
     // Handle eBay Scraper Form Submission
@@ -1303,38 +3311,59 @@
       const resultsContainer = document.getElementById('scraperResults');
       
       if (!input) {
-        alert('Please enter eBay URLs or item numbers');
+        showToast('Please enter eBay URLs or item numbers', 'warning');
         return;
       }
 
-      // Parse input - could be URLs or item numbers
+      // Parse input - supports plain URLs/item numbers and tab-separated rows from spreadsheets
       const items = input.split('\n').filter(line => line.trim()).map(line => {
         const trimmed = line.trim();
-        // If it starts with http, treat as URL; otherwise treat as item number or URL
+        const columns = trimmed.split('\t').map(col => col.trim()).filter(Boolean);
+        const urlMatch = trimmed.match(/https?:\/\/\S+/i);
+
+        if (columns.length >= 2 && columns[1].startsWith('http')) {
+          return {
+            link: columns[1],
+            itemNumber: columns[0] || '',
+            sku: columns[2] || customLabel || ''
+          };
+        }
+
+        if (urlMatch) {
+          const detectedUrl = urlMatch[0];
+          const detectedItemNumber = columns.find(col => /^\d{9,}$/.test(col) && col !== detectedUrl) || '';
+          const detectedSku = columns.find(col => col !== detectedUrl && col !== detectedItemNumber) || customLabel || '';
+
+          return {
+            link: detectedUrl,
+            itemNumber: detectedItemNumber,
+            sku: detectedSku
+          };
+        }
+
         if (trimmed.startsWith('http')) {
           return {
             link: trimmed,
             itemNumber: '',
             sku: customLabel || ''
           };
-        } else {
-          // Could be item number or partial URL
-          return {
-            link: trimmed.includes('.com') ? trimmed : `https://www.ebay.com/itm/${trimmed}`,
-            itemNumber: trimmed.includes('.com') ? '' : trimmed,
-            sku: customLabel || ''
-          };
         }
+
+        return {
+          link: `https://www.ebay.com/itm/${trimmed}`,
+          itemNumber: trimmed,
+          sku: customLabel || ''
+        };
       });
 
       // Show loading state
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Scraping...';
+      submitBtn.textContent = 'Submitting...';
       resultsContainer.style.display = 'none';
 
       try {
-        // Send to scraper endpoint
-        const response = await fetch('http://localhost:3001/scrape', {
+        // Submit scrape job and get job ID
+        const submitResponse = await fetch('http://localhost:3001/scrape', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -1345,68 +3374,41 @@
           })
         });
 
-        if (!response.ok) {
-          throw new Error(`Scraper error: ${response.statusText}`);
+        if (!submitResponse.ok) {
+          throw new Error(`Failed to submit scrape job: ${submitResponse.statusText}`);
         }
 
-        const result = await response.json();
+        const submitResult = await submitResponse.json();
+        const jobId = submitResult.jobId;
 
-        // Display results
-        resultsContainer.innerHTML = '';
-        
-        const scrapedItems = result.results || result.data || [];
-        const successfulItems = scrapedItems.filter(item => !item.error);
-        
-        if (result.success && successfulItems.length > 0) {
-          resultsContainer.innerHTML = `
-            <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; padding: 16px; margin-top: 16px;">
-              <h4 style="margin: 0 0 12px 0; color: #2e7d32;">✓ Scraping Completed</h4>
-              <p style="margin: 0 0 12px 0; color: #558b2f;">Successfully scraped ${successfulItems.length} item(s)</p>
-              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
-                ${successfulItems.map(item => `
-                  <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px;">
-                    ${item.images && item.images.length > 0 ? 
-                      `<img src="http://localhost:3001/${item.images[0]}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
-                      : '<div style="width: 100%; height: 150px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">📦</div>'}
-                    <strong style="display: block; margin-bottom: 4px;">${item.title || 'Untitled'}</strong>
-                    <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold;">$${typeof item.price === 'number' ? item.price.toFixed(2) : 'N/A'}</span>
-                    <span style="display: block; color: #666; font-size: 12px; margin-bottom: 8px;">SKU: ${item.sku || item.customLabel || 'N/A'}</span>
-                    ${item.url ? `<a href="${item.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View on eBay →</a>` : ''}
-                  </div>
-                `).join('')}
-              </div>
-              <p style="margin: 16px 0 0 0; color: #558b2f; font-size: 13px;">Items have been added to your Products inventory</p>
-            </div>
-          `;
-        } else if (scrapedItems.length === 0 || successfulItems.length === 0) {
-          resultsContainer.innerHTML = `
-            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
-              <h4 style="margin: 0 0 8px 0; color: #e65100;">⚠ No Items Found</h4>
-              <p style="margin: 0; color: #bf360c;">Could not find any items matching your criteria. Please check the URLs or item numbers and try again.</p>
-            </div>
-          `;
-        } else {
-          resultsContainer.innerHTML = `
-            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
-              <h4 style="margin: 0 0 8px 0; color: #e65100;">⚠ Scraping Completed with Issues</h4>
-              <p style="margin: 0; color: #bf360c;">${result.summary?.failed || 0} item(s) failed to scrape. ${result.message || 'Please check the item details and try again.'}</p>
-            </div>
-          `;
+        if (!jobId) {
+          throw new Error('No job ID returned from server');
         }
 
+        // Show job tracking UI
+        resultsContainer.innerHTML = `
+          <div style="background: #e3f2fd; border: 1px solid #2196f3; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 12px 0; color: #1565c0;">⏳ Scraping in Progress</h4>
+            <p style="margin: 0 0 12px 0; color: #0d47a1;">Job ID: <code style="background: white; padding: 2px 6px; border-radius: 3px;">${jobId}</code></p>
+            <div id="progressBar" style="width: 100%; height: 8px; background: #90caf9; border-radius: 4px; margin-bottom: 12px; overflow: hidden;">
+              <div id="progressFill" style="width: 0%; height: 100%; background: #1976d2; transition: width 0.3s;"></div>
+            </div>
+            <div id="jobStatus" style="font-size: 14px; color: #0d47a1; margin-bottom: 12px;">Initializing...</div>
+            <div id="itemsList" style="max-height: 300px; overflow-y: auto; background: white; border: 1px solid #90caf9; border-radius: 4px; padding: 8px; margin-bottom: 12px;">
+            </div>
+            <button type="button" onclick="stopTrackingJob()" class="btn btn-secondary" style="margin-top: 8px;">Close</button>
+          </div>
+        `;
         resultsContainer.style.display = 'block';
 
-        // Refresh products list after short delay
-        setTimeout(() => {
-          loadProducts();
-          updateDashboardStats();
-        }, 1000);
+        // Poll for job status
+        await trackScrapeJob(jobId, submitBtn);
 
       } catch (error) {
         console.error('Scraper error:', error);
         resultsContainer.innerHTML = `
           <div style="background: #ffebee; border: 1px solid #f44336; border-radius: 6px; padding: 16px; margin-top: 16px;">
-            <h4 style="margin: 0 0 8px 0; color: #c62828;">✗ Scraping Failed</h4>
+            <h4 style="margin: 0 0 8px 0; color: #c62828;">✗ Submission Failed</h4>
             <p style="margin: 0; color: #b71c1c;">${error.message}</p>
           </div>
         `;
@@ -1416,6 +3418,197 @@
         submitBtn.disabled = false;
         submitBtn.textContent = 'Scrape Listings';
       }
+    }
+
+    // Track scrape job progress
+    let trackingJobId = null;
+    let jobStartTime = null;
+
+    function delay(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function formatElapsedTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    
+    async function trackScrapeJob(jobId, submitBtn) {
+      trackingJobId = jobId;
+      jobStartTime = Date.now();
+      const resultsContainer = document.getElementById('scraperResults');
+      const maxAttempts = 43200; // 12 hours with 1 second polling
+      let attempt = 0;
+      let lastItemStates = {};
+
+      while (trackingJobId === jobId && attempt < maxAttempts) {
+        try {
+          const response = await fetch(`http://localhost:3001/scrape/job/${jobId}`);
+          if (!response.ok) throw new Error('Failed to fetch job status');
+          
+          const { job } = await response.json();
+          
+          // Calculate elapsed time
+          const elapsedSeconds = Math.floor((Date.now() - jobStartTime) / 1000);
+          const elapsedTime = formatElapsedTime(elapsedSeconds);
+          
+          // Update progress bar
+          const progress = job.progress.total > 0 
+            ? Math.round((job.progress.completed / job.progress.total) * 100) 
+            : 0;
+          document.getElementById('progressFill').style.width = progress + '%';
+          
+          // Update status text with elapsed time
+          const skippedCount = job.progress.skipped || 0;
+          const statusText = `${job.progress.completed}/${job.progress.total} items processed • ${job.progress.successful} successful • ${skippedCount} skipped • ${job.progress.failed} failed • Elapsed: ${elapsedTime}`;
+          document.getElementById('jobStatus').textContent = statusText;
+          
+          // Update items list with real-time feedback
+          const itemsList = document.getElementById('itemsList');
+          itemsList.innerHTML = job.items.map((item, idx) => {
+            let icon = '⏳';
+            let color = '#0d47a1';
+            let statusBadge = 'Processing';
+            let badgeBg = '#e3f2fd';
+            
+            if (item.status === 'completed') {
+              icon = '✓';
+              color = '#2e7d32';
+              statusBadge = 'Completed';
+              badgeBg = '#e8f5e9';
+            } else if (item.status === 'skipped') {
+              icon = '⏭';
+              color = '#f57f17';
+              statusBadge = 'Skipped';
+              badgeBg = '#fff8e1';
+            } else if (item.status === 'failed') {
+              icon = '✗';
+              color = '#c62828';
+              statusBadge = 'Failed';
+              badgeBg = '#ffebee';
+            } else if (item.status === 'pending') {
+              icon = '○';
+              color = '#9e9e9e';
+              statusBadge = 'Pending';
+              badgeBg = '#f5f5f5';
+            }
+            
+            // Check if this item just changed status for animation
+            const itemKey = `${item.itemNumber || item.link}`;
+            const justCompleted = lastItemStates[itemKey] !== item.status && item.status === 'completed';
+            const animation = justCompleted ? 'animation: slideInLeft 0.5s ease-out;' : '';
+            lastItemStates[itemKey] = item.status;
+            
+            return `
+              <div style="padding: 10px 12px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; justify-content: space-between; background: ${justCompleted ? '#f1f8e9' : 'transparent'}; transition: background-color 0.3s ease; ${animation}">
+                <div style="flex: 1; display: flex; align-items: center; gap: 12px;">
+                  <span style="color: ${color}; font-weight: bold; font-size: 18px;">${icon}</span>
+                  <div style="flex: 1;">
+                    <div style="font-size: 13px; font-weight: 500; color: #212121;">
+                      ${item.itemNumber ? 'Item: ' + item.itemNumber : 'Link: ' + item.link.substring(0, 50) + '...'}
+                    </div>
+                    ${item.title ? `<div style="font-size: 12px; color: #666; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.title}</div>` : ''}
+                    ${item.skipReason ? `<div style="font-size: 11px; color: #f57f17; margin-top: 3px;">Skipped: ${item.skipReason}</div>` : ''}
+                    ${item.error ? `<div style="font-size: 11px; color: #c62828; margin-top: 3px;">Error: ${item.error}</div>` : ''}
+                  </div>
+                </div>
+                <span style="background: ${badgeBg}; color: ${color}; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; margin-left: 12px;">${statusBadge}</span>
+              </div>
+            `;
+          }).join('');
+          
+          // Check if job is complete
+          if (job.status === 'completed' || job.status === 'partial') {
+            displayJobResults(job);
+            trackingJobId = null;
+            break;
+          }
+          
+          // Wait before next poll
+          await delay(1000);
+          attempt++;
+        } catch (error) {
+          console.error('Error tracking job:', error);
+          await delay(2000);
+          attempt++;
+        }
+      }
+
+      if (trackingJobId === jobId && attempt >= maxAttempts) {
+        resultsContainer.innerHTML += `
+          <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 12px; margin-top: 12px;">
+            <p style="margin: 0; color: #e65100; font-size: 13px;">⚠ Tracking timeout. Job is still processing on the server. Check back in a few moments.</p>
+          </div>
+        `;
+      }
+    }
+
+    function stopTrackingJob() {
+      trackingJobId = null;
+      document.getElementById('scraperResults').style.display = 'none';
+    }
+
+    function displayJobResults(job) {
+      const resultsContainer = document.getElementById('scraperResults');
+      const successfulItems = job.items.filter(item => item.status === 'completed' && item.result);
+      
+      if (successfulItems.length > 0) {
+        resultsContainer.innerHTML = `
+          <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 12px 0; color: #2e7d32;">✓ Scraping Completed</h4>
+            <p style="margin: 0 0 12px 0; color: #558b2f;">Successfully scraped ${successfulItems.length} item(s) from job ${job.id.substring(0, 8)}</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px;">
+              ${successfulItems.map(item => {
+                const result = item.result;
+                return `
+                  <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px;">
+                    ${result.images && result.images.length > 0 ? 
+                      `<img src="http://localhost:3001/${result.images[0]}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
+                      : '<div style="width: 100%; height: 140px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">📦</div>'}
+                    <strong style="display: block; margin-bottom: 4px; font-size: 13px;">${result.title || 'Untitled'}</strong>
+                    <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold; font-size: 14px;">$${typeof result.price === 'number' ? result.price.toFixed(2) : 'N/A'}</span>
+                    <span style="display: block; color: #666; font-size: 11px; margin-bottom: 8px;">SKU: ${result.sku || result.customLabel || item.sku || 'N/A'}</span>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                      ${result.url ? `<a href="${result.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 11px;">View on eBay →</a>` : ''}
+                      ${result.url ? `<a href="${getScrapedDetailsUrl(result.url)}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 11px;">View Scraped →</a>` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <p style="margin: 16px 0 0 0; color: #558b2f; font-size: 13px;">✓ Items automatically added to your Products inventory</p>
+          </div>
+        `;
+      } else {
+        const failedCount = job.progress.failed || 0;
+        const skippedCount = job.progress.skipped || 0;
+
+        if (failedCount === 0 && skippedCount > 0) {
+          resultsContainer.innerHTML = `
+            <div style="background: #fff8e1; border: 1px solid #fbc02d; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #f57f17;">⏭ Scraping Completed with Skips</h4>
+              <p style="margin: 0; color: #8d6e63;">Job ID: ${job.id}</p>
+              <p style="margin: 8px 0 0 0; color: #8d6e63; font-size: 13px;">${skippedCount} item(s) were skipped. No failures detected.</p>
+            </div>
+          `;
+        } else {
+          resultsContainer.innerHTML = `
+            <div style="background: #fff3e0; border: 1px solid #ff9800; border-radius: 6px; padding: 16px; margin-top: 16px;">
+              <h4 style="margin: 0 0 8px 0; color: #e65100;">⚠ Scraping Completed with Issues</h4>
+              <p style="margin: 0; color: #bf360c;">Job ID: ${job.id}</p>
+              <p style="margin: 8px 0 0 0; color: #bf360c; font-size: 13px;">${failedCount} item(s) failed, ${skippedCount} skipped. Backend will retry failed items automatically every 10 minutes.</p>
+            </div>
+          `;
+        }
+      }
+
+      // Refresh products after a delay
+      setTimeout(() => {
+        loadProducts();
+        updateDashboardStats();
+      }, 2000);
     }
 
     // Load sample data for testing
@@ -1444,7 +3637,10 @@
                     <strong style="display: block; margin-bottom: 4px;">${item.title || 'Untitled'}</strong>
                     <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold;">$${typeof item.price === 'number' ? item.price.toFixed(2) : 'N/A'}</span>
                     <span style="display: block; color: #666; font-size: 12px; margin-bottom: 8px;">SKU: ${item.sku || 'N/A'}</span>
-                    ${item.url ? `<a href="${item.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View on eBay →</a>` : ''}
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                      ${item.url ? `<a href="${item.url}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View on eBay →</a>` : ''}
+                      ${item.url ? `<a href="${getScrapedDetailsUrl(item.url)}" target="_blank" style="color: #1976d2; text-decoration: none; font-size: 12px;">View Scraped →</a>` : ''}
+                    </div>
                   </div>
                 `).join('')}
               </div>
@@ -1473,6 +3669,140 @@
       }
     }
 
+    // Scraper Mode Switching
+    function setScraperMode(mode) {
+      const scrapeMode = document.getElementById('scrapeMode');
+      const bulkMode = document.getElementById('bulkMode');
+      const modeScraperBtn = document.getElementById('modeScraperBtn');
+      const modeBulkBtn = document.getElementById('modeBulkBtn');
+
+      if (mode === 'scrape') {
+        scrapeMode.style.display = 'block';
+        bulkMode.style.display = 'none';
+        modeScraperBtn.style.background = 'var(--color-primary)';
+        modeScraperBtn.style.color = 'white';
+        modeScraperBtn.style.borderColor = 'var(--color-primary)';
+        modeBulkBtn.style.background = 'transparent';
+        modeBulkBtn.style.color = 'var(--color-primary)';
+        modeBulkBtn.style.borderColor = 'var(--color-primary)';
+      } else {
+        scrapeMode.style.display = 'none';
+        bulkMode.style.display = 'block';
+        modeBulkBtn.style.background = 'var(--color-primary)';
+        modeBulkBtn.style.color = 'white';
+        modeBulkBtn.style.borderColor = 'var(--color-primary)';
+        modeScraperBtn.style.background = 'transparent';
+        modeScraperBtn.style.color = 'var(--color-primary)';
+        modeScraperBtn.style.borderColor = 'var(--color-primary)';
+      }
+    }
+
+    // Bulk Import Handler
+    async function handleBulkImportSubmit(event) {
+      event.preventDefault();
+
+      const input = document.getElementById('bulkImportInput').value.trim();
+      const submitBtn = document.getElementById('bulkSubmitBtn');
+      const resultsContainer = document.getElementById('scraperResults');
+
+      if (!input) {
+        showToast('Please paste TSV/CSV data', 'warning');
+        return;
+      }
+
+      // Show loading state
+      submitBtn.disabled = true;
+      const originalText = document.getElementById('bulkBtnText').textContent;
+      document.getElementById('bulkBtnText').textContent = 'Importing...';
+      document.getElementById('bulkSpinner').style.display = 'inline-block';
+
+      try {
+        const response = await fetch('http://localhost:3001/api/products/import/bulk', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ data: input })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Import failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        // Display success results
+        resultsContainer.innerHTML = `
+          <div style="background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 12px 0; color: #2e7d32;">✓ Import Successful</h4>
+            <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px; margin-bottom: 12px;">
+              <p style="margin: 0; color: #558b2f;"><strong>Import Summary</strong></p>
+              <p style="margin: 8px 0 0 0; font-size: 13px; color: #666;">
+                ${result.imported ? `✓ ${result.imported} new products added` : ''} ${result.imported && (result.updated || result.skipped || result.errors) ? ' | ' : ''}
+                ${result.updated ? `✓ ${result.updated} products updated` : ''} ${result.updated && (result.skipped || result.errors) ? ' | ' : ''}
+                ${result.skipped ? `○ ${result.skipped} unchanged (skipped)` : ''} ${result.skipped && result.errors ? ' | ' : ''}
+                ${result.errors ? `⚠ ${result.errors} errors` : ''}
+              </p>
+              ${result.message ? `<p style="margin: 8px 0 0 0; font-size: 12px; color: #1976d2; font-style: italic;">${result.message}</p>` : ''}
+            </div>
+            ${result.details && result.details.length > 0 ? `
+              <div style="background: #f5f5f5; border-radius: 4px; padding: 12px; max-height: 300px; overflow-y: auto;">
+                <strong style="display: block; margin-bottom: 8px; color: #333;">Import Details:</strong>
+                ${result.details.map(d => `
+                  <div style="padding: 6px 0; border-bottom: 1px solid #e0e0e0; font-size: 13px; color: #555;">
+                    <strong>${d.sku || d.title}</strong> 
+                    ${d.status === 'created' ? '<span style="color: #2e7d32;">(New)</span>' : 
+                      d.status === 'updated' ? '<span style="color: #1976d2;">(Updated)</span>' : 
+                      d.status === 'skipped' ? '<span style="color: #757575;">(Skipped - No Changes)</span>' : ''}
+                    ${d.ebayCategory ? ` - Category: ${d.ebayCategory} [ID: ${d.ebayCategoryId || 'N/A'}]` : ''}
+                    ${d.reason ? ` <span style="color: #757575; font-size: 11px;">(${d.reason})</span>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            <p style="margin: 12px 0 0 0; color: #558b2f; font-size: 13px;">
+              ✓ All existing products preserved. Only new and changed products were modified.
+            </p>
+          </div>
+        `;
+        resultsContainer.style.display = 'block';
+
+      } catch (error) {
+        console.error('Import error:', error);
+        resultsContainer.innerHTML = `
+          <div style="background: #ffebee; border: 1px solid #f44336; border-radius: 6px; padding: 16px; margin-top: 16px;">
+            <h4 style="margin: 0 0 8px 0; color: #c62828;">✗ Import Failed</h4>
+            <p style="margin: 0; color: #b71c1c;">${error.message}</p>
+            <details style="margin-top: 8px;">
+              <summary style="color: #1976d2; cursor: pointer; font-size: 13px;">View Error Details</summary>
+              <pre style="background: white; padding: 8px; border-radius: 4px; overflow-x: auto; font-size: 11px; margin-top: 8px;">${error.stack}</pre>
+            </details>
+          </div>
+        `;
+        resultsContainer.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        document.getElementById('bulkBtnText').textContent = originalText;
+        document.getElementById('bulkSpinner').style.display = 'none';
+      }
+    }
+
+    // Load sample bulk import data
+    async function loadSampleBulkData() {
+      const textarea = document.getElementById('bulkImportInput');
+      if (!textarea) return;
+
+      const sampleData = `Item number	Link	Custom label (SKU)	Title	Available quantity	Currency	Start price	eBay category 1 name	eBay category 1 number
+304569312160	https://www.ebay.com/itm/304569312160	USL	1911 Tactical Grips	4	USD	23.28	Pistol Parts	73944
+302710852493	https://www.ebay.com/itm/302710852493	AR-SAFETY	AR-15 Safety Selector	10	USD	8.99	Rifle Parts	33632
+304053796929	https://www.ebay.com/itm/304053796929	SPRING-KIT	Firearm Spring Kit	15	USD	12.50	Miscellaneous	99999`;
+
+      textarea.value = sampleData;
+      const resultsContainer = document.getElementById('scraperResults');
+      resultsContainer.style.display = 'none';
+    }
+
     // Close modals on outside click
     document.querySelectorAll('.modal').forEach(modal => {
       modal.addEventListener('click', (e) => {
@@ -1482,9 +3812,445 @@
       });
     });
 
+    // Toast Notification System
+    function showToast(message, type = 'info', duration = 5000) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      
+      const icons = {
+        success: '✓',
+        error: '✗',
+        warning: '⚠',
+        info: 'ℹ'
+      };
+      
+      toast.innerHTML = `
+        <div class="toast-icon">${icons[type] || 'ℹ'}</div>
+        <div class="toast-content">${message}</div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+      `;
+      
+      container.appendChild(toast);
+      
+      // Auto-remove after duration
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+    
+    // Modal Confirmation System
+    function showConfirm(message, title = 'Confirm Action') {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const messageEl = document.getElementById('confirmMessage');
+        const titleEl = document.getElementById('confirmTitle');
+        
+        titleEl.textContent = title;
+        messageEl.innerHTML = message.replace(/\n/g, '<br>');
+        modal.style.display = 'flex';
+        
+        const handleConfirm = () => {
+          modal.style.display = 'none';
+          cleanup();
+          resolve(true);
+        };
+        
+        const handleCancel = () => {
+          modal.style.display = 'none';
+          cleanup();
+          resolve(false);
+        };
+        
+        const cleanup = () => {
+          document.getElementById('confirmYes').removeEventListener('click', handleConfirm);
+          document.getElementById('confirmNo').removeEventListener('click', handleCancel);
+        };
+        
+        document.getElementById('confirmYes').addEventListener('click', handleConfirm);
+        document.getElementById('confirmNo').addEventListener('click', handleCancel);
+        
+        // Close on outside click
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            handleCancel();
+          }
+        });
+      });
+    }
+
     // Initialize
     initTheme();
+    loadRuntimeEnvironment();
     updateDashboardStats();
+
+    // ============================================================================
+    // ORDERS MANAGEMENT
+    // ============================================================================
+
+    // Load orders from API
+    async function loadOrders(forceRefresh = false) {
+      const loadingEl = document.getElementById('orders-loading');
+      const errorEl = document.getElementById('orders-error');
+      const emptyEl = document.getElementById('orders-empty');
+      const tableContainer = document.getElementById('orders-table-container');
+      const tableBody = document.getElementById('orders-table-body');
+      const countBadge = document.getElementById('orders-count-badge');
+      const cacheInfo = document.getElementById('orders-cache-info');
+
+      // Show loading
+      loadingEl.style.display = 'block';
+      errorEl.style.display = 'none';
+      emptyEl.style.display = 'none';
+      tableContainer.style.display = 'none';
+
+      try {
+        // Get filter values
+        const source = document.getElementById('order-source-filter').value;
+        const status = document.getElementById('order-status-filter').value;
+        const limit = document.getElementById('order-limit-filter').value;
+
+        // Build API URL with query params
+        const params = new URLSearchParams({
+          source,
+          limit,
+          forceRefresh: forceRefresh ? '1' : '0'
+        });
+
+        if (status) {
+          params.append('status', status);
+        }
+
+        const response = await fetch(`http://localhost:3001/api/orders?${params.toString()}`);
+        const data = await response.json();
+
+        loadingEl.style.display = 'none';
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to load orders');
+        }
+
+        const orders = data.orders || [];
+        
+        // Update cache info
+        if (data.cached) {
+          const cacheAgeMinutes = Math.floor(data.cacheAge / 60000);
+          cacheInfo.textContent = `📦 Cached data (${cacheAgeMinutes} min old) • Environment: ${data.environment}`;
+          cacheInfo.style.color = data.stale ? 'var(--color-warning)' : 'var(--text-tertiary)';
+        } else {
+          cacheInfo.textContent = `✨ Fresh data • Environment: ${data.environment}`;
+          cacheInfo.style.color = 'var(--color-success)';
+        }
+
+        // Update count badge
+        countBadge.textContent = `${orders.length} orders`;
+
+        if (orders.length === 0) {
+          emptyEl.style.display = 'flex';
+          return;
+        }
+
+        // Populate table
+        tableContainer.style.display = 'block';
+        tableBody.innerHTML = orders.map(order => {
+          const date = new Date(order.creationDate).toLocaleDateString();
+          const buyerName = order.buyer?.username || 'N/A';
+          const itemCount = order.lineItems?.length || 0;
+          const total = order.pricingSummary?.total?.value || '0.00';
+          const currency = order.pricingSummary?.total?.currency || 'USD';
+          
+          const fulfillmentStatus = order.orderFulfillmentStatus || 'UNKNOWN';
+          const paymentStatus = order.orderPaymentStatus || 'UNKNOWN';
+
+          // Status badge colors
+          const statusColors = {
+            'NOT_STARTED': 'background: #fef3c7; color: #92400e;',
+            'IN_PROGRESS': 'background: #dbeafe; color: #1e40af;',
+            'FULFILLED': 'background: #d1fae5; color: #065f46;',
+            'CANCELLED': 'background: #fee2e2; color: #991b1b;'
+          };
+
+          const paymentColors = {
+            'PAID': 'background: #d1fae5; color: #065f46;',
+            'PENDING': 'background: #fef3c7; color: #92400e;',
+            'FAILED': 'background: #fee2e2; color: #991b1b;'
+          };
+
+          const statusStyle = statusColors[fulfillmentStatus] || 'background: #f3f4f6; color: #374151;';
+          const paymentStyle = paymentColors[paymentStatus] || 'background: #f3f4f6; color: #374151;';
+
+          return `
+            <tr style="border-bottom: 1px solid var(--border-color);">
+              <td style="padding: 12px;">
+                <div style="font-weight: 500; color: var(--text-primary);">${order.legacyOrderId || order.orderId}</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">${order.orderId}</div>
+              </td>
+              <td style="padding: 12px;">
+                <div style="color: var(--text-primary);">${date}</div>
+              </td>
+              <td style="padding: 12px;">
+                <div style="color: var(--text-primary);">${buyerName}</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">${order.shippingAddress?.fullName || ''}</div>
+              </td>
+              <td style="padding: 12px;">
+                <div style="color: var(--text-primary);">${itemCount} item${itemCount !== 1 ? 's' : ''}</div>
+              </td>
+              <td style="padding: 12px;">
+                <div style="font-weight: 500; color: var(--text-primary);">${currency} ${total}</div>
+              </td>
+              <td style="padding: 12px;">
+                <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; ${statusStyle}">
+                  ${fulfillmentStatus.replace(/_/g, ' ')}
+                </span>
+              </td>
+              <td style="padding: 12px;">
+                <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; ${paymentStyle}">
+                  ${paymentStatus}
+                </span>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        // Update dashboard stat
+        document.getElementById('stat-orders').textContent = orders.filter(o => 
+          o.orderFulfillmentStatus === 'NOT_STARTED' || o.orderFulfillmentStatus === 'IN_PROGRESS'
+        ).length;
+
+      } catch (error) {
+        console.error('Error loading orders:', error);
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        
+        // Enhanced error display
+        let errorHtml = `<div style="color: var(--color-danger); font-weight: 600;">Error: ${error.message || 'Failed to load orders'}</div>`;
+        
+        // Check if we have solution details from API
+        try {
+          const response = await fetch(`http://localhost:3001/api/orders?${new URLSearchParams({ source: 'ebay', limit: '10' }).toString()}`);
+          const errorData = await response.json();
+          
+          if (errorData.errorType === 'oauth' || errorData.errorType === 'scope') {
+            errorHtml += `
+              <div style="margin-top: 16px; padding: 16px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; color: #856404;">
+                <div style="font-weight: 600; margin-bottom: 8px;">🔐 OAuth Token Issue</div>
+                <div style="font-size: 14px; margin-bottom: 12px;">Your eBay token doesn't have the required permissions to fetch orders.</div>
+                <div style="font-weight: 600; margin-bottom: 8px;">Quick Fix:</div>
+                <ol style="margin: 0; padding-left: 24px; font-size: 13px;">
+                  <li style="margin-top: 4px;">Click below to get a new OAuth authorization URL</li>
+                  <li style="margin-top: 4px;">Complete eBay authorization</li>
+                  <li style="margin-top: 4px;">Update your .env file with the new token</li>
+                  <li style="margin-top: 4px;">Restart the server</li>
+                </ol>
+                <div style="margin-top: 12px;">
+                  <a href="/api/ebay-auth-url" target="_blank" class="btn btn-primary" style="display: inline-block; padding: 8px 16px; text-decoration: none;">
+                    🔐 Get Authorization URL
+                  </a>
+                </div>
+              </div>
+            `;
+          }
+        } catch (e) {
+          // Ignore error parsing
+        }
+        
+        errorEl.innerHTML = errorHtml;
+      }
+    }
+
+    // Refresh orders (force refresh cache)
+    async function refreshOrders() {
+      await loadOrders(true);
+    }
+
+    // ============================================================================
+    // END ORDERS MANAGEMENT
+    // ============================================================================
   </script>
+  
+  <!-- Toast Container -->
+  <div id="toastContainer"></div>
+  
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="confirm-modal">
+    <div class="confirm-content">
+      <h3 id="confirmTitle">Confirm Action</h3>
+      <div id="confirmMessage"></div>
+      <div class="confirm-buttons">
+        <button id="confirmNo" class="btn btn-secondary">Cancel</button>
+        <button id="confirmYes" class="btn btn-primary">Confirm</button>
+      </div>
+    </div>
+  </div>
+  
+  <style>
+    /* Toast Notification Styles */
+    #toastContainer {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 400px;
+    }
+    
+    .toast {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease-out;
+      min-width: 300px;
+      backdrop-filter: blur(10px);
+    }
+    
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+    
+    .toast-success {
+      background: linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%);
+      color: white;
+    }
+    
+    .toast-error {
+      background: linear-gradient(135deg, #c62828 0%, #ef5350 100%);
+      color: white;
+    }
+    
+    .toast-warning {
+      background: linear-gradient(135deg, #f57c00 0%, #ffa726 100%);
+      color: white;
+    }
+    
+    .toast-info {
+      background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+      color: white;
+    }
+    
+    .toast-icon {
+      font-size: 24px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    
+    .toast-content {
+      flex: 1;
+      font-size: 14px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+    
+    .toast-close {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    
+    .toast-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Confirmation Modal Styles */
+    .confirm-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(4px);
+      z-index: 10001;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    .confirm-content {
+      background: var(--bg-primary);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      animation: scaleIn 0.2s ease-out;
+    }
+    
+    @keyframes scaleIn {
+      from {
+        transform: scale(0.9);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    .confirm-content h3 {
+      margin: 0 0 16px 0;
+      font-size: 20px;
+      color: var(--text-primary);
+    }
+    
+    .confirm-content #confirmMessage {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    
+    .confirm-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+    
+    .confirm-buttons .btn {
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
 </body>
 </html>

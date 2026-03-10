@@ -1,0 +1,38 @@
+<svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- Charcoal Background -->
+  <rect width="400" height="80" fill="#2c2c2c" rx="6"/>
+  
+  <!-- Knife Icon (Compact) -->
+  <g transform="translate(50, 40)">
+    <!-- Blade -->
+    <path d="M -20,0 L 20,8 L 20,12 L -20,4 Z" fill="#6b7280" stroke="#1a4d2e" stroke-width="1"/>
+    <path d="M -20,0 L 20,8 L 18,9 L -20,1.5 Z" fill="#808080" opacity="0.6"/>
+    
+    <!-- Handle -->
+    <rect x="-28" y="-2" width="10" height="8" fill="#92400e" stroke="#1a4d2e" stroke-width="0.8"/>
+    <line x1="-28" y1="1" x2="-18" y2="1" stroke="#d97706" stroke-width="0.8"/>
+    <line x1="-28" y1="4" x2="-18" y2="4" stroke="#d97706" stroke-width="0.8"/>
+  </g>
+  
+  <!-- Divider Line -->
+  <line x1="85" y1="20" x2="85" y2="60" stroke="#1a4d2e" stroke-width="2"/>
+  
+  <!-- Brand Name -->
+  <text x="110" y="50" 
+        font-family="'Bebas Neue', 'Impact', sans-serif" 
+        font-size="36" 
+        font-weight="900" 
+        fill="#ffffff" 
+        letter-spacing="4">STRAPEY</text>
+  
+  <!-- Motto -->
+  <text x="278" y="50" 
+        font-family="'Open Sans', sans-serif" 
+        font-size="10" 
+        fill="#d97706" 
+        letter-spacing="1.5">CRAFTED FOR WILD</text>
+  
+  <!-- Accent Dots -->
+  <circle cx="265" cy="46" r="2" fill="#92400e"/>
+  <circle cx="385" cy="46" r="2" fill="#92400e"/>
+</svg>

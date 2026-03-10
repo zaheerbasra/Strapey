@@ -5,6 +5,7 @@
 
 const prisma = require('../../core/database');
 const logger = require('../../core/logger')('products.service');
+const activityLogService = require('./product-activity-log.service');
 
 class ProductsService {
   /**
@@ -105,7 +106,7 @@ class ProductsService {
   /**
    * Create new product
    */
-  async createProduct(productData) {
+  async createProduct(productData, performedBy = 'system', sourceSystem = 'strapey') {
     try {
       const product = await prisma.product.create({
         data: {
@@ -119,11 +120,25 @@ class ProductsService {
           images: JSON.stringify(productData.images || []),
           category: productData.category || null,
           weight: productData.weight ? parseFloat(productData.weight) : null,
+          weightUnit: productData.weightUnit || null,
           dimensions: productData.dimensions ? JSON.stringify(productData.dimensions) : null,
           specifics: productData.specifics ? JSON.stringify(productData.specifics) : null,
           sourceUrl: productData.sourceUrl || null
         }
       });
+
+      // Log product creation
+      await activityLogService.logProductCreated(
+        product.id,
+        {
+          sku: product.sku,
+          title: product.title,
+          price: product.price,
+          inventory: product.inventory
+        },
+        performedBy,
+        sourceSystem
+      );
 
       logger.info('Product created', { id: product.id, sku: product.sku });
       return product;
@@ -136,8 +151,14 @@ class ProductsService {
   /**
    * Update product
    */
-  async updateProduct(id, updates) {
+  async updateProduct(id, updates, performedBy = 'system') {
     try {
+      // Get current product state before update
+      const currentProduct = await prisma.product.findUnique({ where: { id } });
+      if (!currentProduct) {
+        throw new Error('Product not found');
+      }
+
       // Parse JSON fields if provided
       if (updates.images && typeof updates.images === 'object') {
         updates.images = JSON.stringify(updates.images);
@@ -154,7 +175,29 @@ class ProductsService {
         data: updates
       });
 
-      logger.info('Product updated', { id: product.id, sku: product.sku });
+      // Log field-specific changes (non-blocking)
+      try {
+        const changedFields = Object.keys(updates);
+        for (const field of changedFields) {
+          const oldValue = currentProduct[field];
+          const newValue = product[field];
+          
+          // Only log if value actually changed
+          if (oldValue !== newValue) {
+            await activityLogService.logFieldUpdate(
+              id,
+              field,
+              oldValue,
+              newValue,
+              performedBy
+            );
+          }
+        }
+      } catch (logError) {
+        logger.error('Failed to log product update activity', { id, error: logError.message });
+      }
+
+      logger.info('Product updated', { id: product.id, sku: product.sku, changedFields: Object.keys(updates) });
       return product;
     } catch (error) {
       logger.error('Failed to update product', { id, error: error.message });
@@ -165,8 +208,24 @@ class ProductsService {
   /**
    * Delete product
    */
-  async deleteProduct(id) {
+  async deleteProduct(id, performedBy = 'system') {
     try {
+      // Get product details before deletion
+      const product = await prisma.product.findUnique({ where: { id } });
+
+      // Log deletion before actually deleting
+      await activityLogService.logActivity({
+        productId: id,
+        actionType: activityLogService.getActionTypes().PRODUCT_DELETED,
+        actionDescription: `Product deleted: ${product.sku} - ${product.title}`,
+        previousValue: {
+          sku: product.sku,
+          title: product.title,
+          price: product.price
+        },
+        performedBy
+      });
+
       await prisma.product.delete({
         where: { id }
       });
@@ -182,8 +241,12 @@ class ProductsService {
   /**
    * Update inventory
    */
-  async updateInventory(id, quantity, operation = 'set') {
+  async updateInventory(id, quantity, operation = 'set', performedBy = 'system') {
     try {
+      // Get current inventory before update
+      const currentProduct = await prisma.product.findUnique({ where: { id } });
+      const oldInventory = currentProduct.inventory;
+
       let product;
       
       if (operation === 'increment') {
@@ -202,6 +265,15 @@ class ProductsService {
           data: { inventory: quantity }
         });
       }
+
+      // Log inventory change
+      await activityLogService.logFieldUpdate(
+        id,
+        'inventory',
+        oldInventory,
+        product.inventory,
+        performedBy
+      );
 
       logger.info('Inventory updated', { id, inventory: product.inventory });
       return product;

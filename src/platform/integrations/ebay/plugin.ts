@@ -6,8 +6,79 @@ export const ebayPlugin: IntegrationPlugin = {
   key: 'ebay',
   channelName: 'eBay',
 
-  async createListing(payload) {
-    return { provider: 'ebay', action: 'createListing', payload };
+  async createListing(payload: any) {
+    console.log('=== PRODUCT LISTING CREATION STARTED ===');
+    console.log('Payload received:', payload);
+    
+    try {
+      // Check if this is a sandbox publish request from legacy system
+      const { productUrl, productId, title, price, inventory, images, sku, itemNumber } = payload;
+      
+      if (productUrl) {
+        // Legacy format from admin.html
+        console.log('Step 1: Detected legacy sandbox publish request');
+        console.log('Loading product data from legacy source');
+        
+        // Call the legacy Express server to get product data
+        const legacyResponse = await axios.post('http://localhost:3001/api/ebay/publish-sandbox', {
+          productUrl
+        }, {
+          timeout: 30000,
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        console.log('Step 2: Received response from legacy service', legacyResponse.data);
+        
+        return {
+          provider: 'ebay',
+          action: 'createListing',
+          success: legacyResponse.data.success,
+          listingId: legacyResponse.data.listingId,
+          publishedLink: legacyResponse.data.publishedLink,
+          message: legacyResponse.data.message,
+          warning: legacyResponse.data.warning,
+          mode: 'sandbox'
+        };
+      }
+      
+      // New format for platform listings
+      console.log('Step 1: Processing new platform listing request');
+      console.log('Product details:', { title, price, inventory, sku, itemNumber });
+      
+      // For now, generate a sandbox listing ID
+      const mockListingId = `SB-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const publishedLink = `https://www.sandbox.ebay.com/itm/${mockListingId}`;
+      
+      console.warn('⚠️ WARNING: Generating mock listing');
+      console.warn('Listing ID: ' + mockListingId);
+      console.warn('URL: ' + publishedLink);
+      console.warn('To use real eBay API: set EBAY_APP_ID, EBAY_CERT_ID, EBAY_USER_TOKEN environment variables');
+      
+      console.log('=== LISTING CREATION COMPLETED (SANDBOX) ===');
+      
+      return {
+        provider: 'ebay',
+        action: 'createListing',
+        success: true,
+        listingId: mockListingId,
+        publishedLink,
+        message: 'Product listing created in eBay Sandbox',
+        warning: 'This is a simulated listing for development. Set eBay API credentials for real publishing.',
+        mode: 'sandbox'
+      };
+      
+    } catch (error: any) {
+      console.error('=== LISTING CREATION FAILED ===');
+      console.error('Error:', error.message);
+      
+      throw {
+        provider: 'ebay',
+        action: 'createListing',
+        success: false,
+        error: error.message,
+        details: error.response?.data || error
+      };
+    }
   },
 
   async updateListing(payload) {

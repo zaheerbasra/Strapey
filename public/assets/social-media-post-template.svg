@@ -1,0 +1,72 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="socialGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f2919;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a4d2e;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#socialGradient)"/>
+  
+  <!-- Subtle Texture -->
+  <rect width="1080" height="1080" fill="url(#damascus)" opacity="0.1"/>
+  
+  <!-- Content Area -->
+  <rect x="80" y="80" width="920" height="920" fill="rgba(0,0,0,0.3)" rx="20"/>
+  
+  <!-- Icon/Logo Area -->
+  <circle cx="540" cy="350" r="120" fill="#2c2c2c" stroke="#d97706" stroke-width="6"/>
+  <g transform="translate(540, 350)">
+    <path d="M -60,-10 L 70,15 L 70,25 L -60,0 Z" fill="#6b7280" stroke="#ffffff" stroke-width="2"/>
+    <rect x="-85" y="-10" width="30" height="24" fill="#92400e" stroke="#d97706" stroke-width="2"/>
+  </g>
+  
+  <!-- Brand Name -->
+  <text x="540" y="560" 
+        font-family="'Bebas Neue', 'Impact', sans-serif" 
+        font-size="96" 
+        font-weight="900" 
+        fill="#ffffff" 
+        text-anchor="middle"
+        letter-spacing="8">STRAPEY</text>
+  
+  <!-- Motto -->
+  <text x="540" y="630" 
+        font-family="'Open Sans', sans-serif" 
+        font-size="32" 
+        fill="#d97706" 
+        text-anchor="middle"
+        letter-spacing="4">CRAFTED FOR WILD</text>
+  
+  <!-- Product Highlight Text -->
+  <text x="540" y="750" 
+        font-family="'Open Sans', sans-serif" 
+        font-size="28" 
+        fill="#ffffff" 
+        text-anchor="middle"
+        letter-spacing="2">[PRODUCT NAME]</text>
+  
+  <text x="540" y="820" 
+        font-family="'Open Sans', sans-serif" 
+        font-size="20" 
+        fill="#c0c0c0" 
+        text-anchor="middle">Premium Hunting & Kitchen Knives</text>
+  
+  <!-- Call to Action -->
+  <rect x="340" y="880" width="400" height="70" fill="#d97706" rx="35"/>
+  <text x="540" y="928" 
+        font-family="'Bebas Neue', sans-serif" 
+        font-size="32" 
+        fill="#ffffff" 
+        text-anchor="middle"
+        letter-spacing="3">SHOP NOW</text>
+  
+  <!-- Social Media Icons -->
+  <text x="540" y="995" 
+        font-family="'Open Sans', sans-serif" 
+        font-size="16" 
+        fill="#808080" 
+        text-anchor="middle"
+        letter-spacing="2">#Strapey #CraftedForWild #PremiumKnives</text>
+</svg>
