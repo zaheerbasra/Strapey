@@ -819,10 +819,25 @@
       }
     }
 
+    function getBackendOrigin() {
+      if (window.location.port === '3001') return window.location.origin;
+      return `${window.location.protocol}//${window.location.hostname}:3001`;
+    }
+
     function safeImageUrl(path) {
       if (!path) return null;
-      const normalized = String(path).replace(/^[./]*/, '').replace(/\\\\/g, '/').replace(/\\/g, '/');
-      return '/' + normalized;
+      const raw = String(path).trim();
+      if (!raw) return null;
+
+      // Preserve absolute URLs (CDN/external assets).
+      if (/^https?:\/\//i.test(raw)) return raw;
+
+      const normalized = raw
+        .replace(/^[./]*/, '')
+        .replace(/\\\\/g, '/')
+        .replace(/\\/g, '/');
+
+      return `${getBackendOrigin()}/${normalized}`;
     }
 
     function escapeHtml(str) {
@@ -879,9 +894,9 @@
 
         const galleryHtml = hasImages ? `
               <div class="listing-gallery">
-                <img class="listing-main-img" src="${mainImgUrl}" alt="${title}" data-listing-index="${index}">
+                <img class="listing-main-img" src="${mainImgUrl}" alt="${title}" data-listing-index="${index}" loading="eager" decoding="async" fetchpriority="high">
                 <div class="listing-thumbs" data-listing-index="${index}">
-                  ${allThumbs.map((src, i) => `<img class="listing-thumb ${i === 0 ? 'active' : ''}" src="${src}" alt="" data-src="${src}">`).join('')}
+                  ${allThumbs.map((src, i) => `<img class="listing-thumb ${i === 0 ? 'active' : ''}" src="${src}" alt="" data-src="${src}" loading="lazy" decoding="async">`).join('')}
                 </div>
               </div>
             ` : '';

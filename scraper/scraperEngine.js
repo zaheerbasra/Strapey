@@ -72,7 +72,7 @@ class ScraperEngine {
 
       // Download images
       if (data.images && data.images.length > 0) {
-        const imageFolder = await this.downloadImages(data.images, data.itemNumber);
+        const imageFolder = await this.downloadImages(data.images, data.itemNumber, sku);
         data.imagesOriginal = imageFolder;
       }
 
@@ -284,9 +284,11 @@ class ScraperEngine {
     return data;
   }
 
-  async downloadImages(imageUrls, itemNumber) {
-    const hash = crypto.createHash('md5').update(itemNumber).digest('hex');
-    const imageFolder = path.join(this.config.output.imagePath, hash);
+  async downloadImages(imageUrls, itemNumber, sku) {
+    // Use SKU-based folder structure: data/images/{SKU}/
+    // Fallback to itemNumber if SKU is not provided
+    const folderName = sku || itemNumber;
+    const imageFolder = path.join(this.config.output.imagePath, 'images', folderName);
 
     if (!fs.existsSync(imageFolder)) {
       fs.mkdirSync(imageFolder, { recursive: true });

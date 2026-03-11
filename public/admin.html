@@ -958,16 +958,14 @@
           
           <!-- Search and Filter Controls -->
           <div style="padding: 20px; background: linear-gradient(to bottom, #fafbfc 0%, #ffffff 100%); border-bottom: 1px solid var(--border);">
-            <!-- Search Bar -->
+            <!-- Multi-SKU Search -->
             <div style="margin-bottom: 16px;">
-              <div style="position: relative; max-width: 600px;">
-                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 16px;">🔍</span>
-                <input type="text" id="productSearch" placeholder="Search by SKU, title, or item number..." 
-                  style="width: 100%; padding: 10px 12px 10px 38px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: all 0.2s; outline: none;"
-                  onkeyup="handleProductSearch()"
-                  onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'"
-                  onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none'">
-              </div>
+              <label style="display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #374151;">🔍 Search: Enter multiple SKUs (one per line) or search by title/item number</label>
+              <textarea id="productSearch" placeholder="FFD00220&#10;FFD00221&#10;FFD00222&#10;&#10;Or search: knife grips, 1911, etc." 
+                style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 13px; font-family: 'Monaco', monospace; resize: vertical; min-height: 80px; transition: all 0.2s; outline: none;"
+                onkeyup="handleProductSearch()"
+                onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59,130,246,0.1)'"
+                onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none'"></textarea>
             </div>
             
             <!-- Filters Row -->
@@ -1014,11 +1012,30 @@
                 <label style="font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">Show:</label>
                 <select id="pageSize" onchange="changePageSize()" style="border: none; background: transparent; padding: 4px 8px; font-size: 13px; font-weight: 500; cursor: pointer; outline: none; color: #1f2937;">
                   <option value="10">10</option>
-                  <option value="25">25</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
                 </select>
                 <span style="font-size: 12px; color: #9ca3af;">per page</span>
+              </div>
+            </div>
+            
+            <!-- Bulk Actions Bar -->
+            <div id="bulkActionsBar" style="margin-top: 16px; padding: 16px; background: #eff6ff; border: 2px solid #93c5fd; border-radius: 8px; display: none;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                  <span id="selectedCount" style="font-weight: 600; color: #1e40af; font-size: 14px;">0 items selected</span>
+                  <button class="btn btn-sm" style="background: #ef4444; color: white;" onclick="clearProductSelection()">Clear Selection</button>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="bulkScrapeProducts()" id="bulkScrapeBtn">🔄 Scrape Selected</button>
+                  <button class="btn btn-sm" style="background: #10b981; color: white;" onclick="bulkPublishProducts()" id="bulkPublishBtn">📤 Publish Selected to eBay</button>
+                </div>
+              </div>
+              <div id="bulkProgressBar" style="display: none; margin-top: 12px;">
+                <div style="background: #d1d5db; height: 24px; border-radius: 4px; overflow: hidden;">
+                  <div id="bulkProgress" style="background: linear-gradient(90deg, #10b981, #059669); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                </div>
+                <div id="bulkProgressText" style="margin-top: 8px; font-size: 12px; color: #374151;"></div>
               </div>
             </div>
           </div>
@@ -1040,6 +1057,7 @@
               <table>
                 <thead>
                   <tr>
+                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAllProducts" onchange="toggleSelectAllProducts()" style="width: 18px; height: 18px; cursor: pointer;"></th>
                     <th>Image</th>
                     <th>Item #</th>
                     <th>SKU</th>
@@ -2195,24 +2213,48 @@
     }
 
     function applyFilters() {
-      const searchTerm = document.getElementById('productSearch').value.toLowerCase();
+      const searchInput = document.getElementById('productSearch').value.trim();
       const statusFilter = document.getElementById('statusFilter').value;
       const groupFilter = document.getElementById('groupFilter').value;
       
+      // Parse multi-line SKUs from search input
+      const skuLines = searchInput.split('\n').map(line => line.trim().toUpperCase()).filter(line => line.length > 0);
+      const singleLineSearch = searchInput.toLowerCase();
+      const isMultiSkuSearch = skuLines.length > 1 || (skuLines.length === 1 && singleLineSearch.indexOf('\n') === -1 && /^[A-Z0-9\-]+$/.test(singleLineSearch));
+      
       filteredProducts = allProducts.filter(product => {
         // Apply search filter
-        const sku = (product.sku || '').toLowerCase();
+        const sku = (product.sku || '').toUpperCase();
         const title = (product.title || '').toLowerCase();
         const itemNumber = (product.id || '').toLowerCase();
-        const groupLabel = (product.productGroupLabel || product.productGroup || '').toLowerCase();
-        const matchesSearch = !searchTerm || sku.includes(searchTerm) || title.includes(searchTerm) || itemNumber.includes(searchTerm) || groupLabel.includes(searchTerm);
+        
+        let matchesSearch = true;
+        if (searchInput) {
+          if (isMultiSkuSearch && skuLines.length > 0) {
+            // Multi-SKU search mode
+            matchesSearch = skuLines.some(line => sku === line || sku.includes(line.trim()));
+          } else if (skuLines.length === 1 && /^[A-Z0-9\-]+$/.test(skuLines[0])) {
+            // Single SKU search
+            matchesSearch = sku === skuLines[0] || sku.includes(skuLines[0]);
+          } else {
+            // Text search mode
+            matchesSearch = sku.includes(singleLineSearch) || title.includes(singleLineSearch) || itemNumber.includes(singleLineSearch);
+          }
+        }
         
         // Apply status filter
         let matchesStatus = true;
+        const isPublished = !!(
+          product.publishedToProduction ||
+          product.productionLink ||
+          product.productionListingId ||
+          product.publishedLink ||
+          product.sandboxListingId
+        );
         if (statusFilter === 'published') {
-          matchesStatus = !!product.publishedLink;
+          matchesStatus = isPublished;
         } else if (statusFilter === 'draft') {
-          matchesStatus = !product.publishedLink;
+          matchesStatus = !isPublished;
         }
 
         const productGroup = String(product.productGroup || 'other').toLowerCase();
@@ -2246,11 +2288,18 @@
 
       // Render products table
       tbody.innerHTML = paginatedProducts.map(product => {
-        const firstImage = product.images && product.images.length > 0 ? product.images[0] : '';
-        const imageUrl = firstImage ? `http://localhost:3001/${firstImage}` : '';
+        const firstImage = product.imageSourceUrls && product.imageSourceUrls.length > 0 ? product.imageSourceUrls[0] : '';
+        const imageUrl = firstImage ? `http://localhost:3001${firstImage}` : '';
         const price = typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
-        const status = product.publishedLink ? 'Published' : 'Draft';
-        const statusClass = product.publishedLink ? 'badge-success' : 'badge-warning';
+        const isPublished = !!(
+          product.publishedToProduction ||
+          product.productionLink ||
+          product.productionListingId ||
+          product.publishedLink ||
+          product.sandboxListingId
+        );
+        const status = product.publishStatus || (isPublished ? 'Published' : 'Draft');
+        const statusClass = isPublished ? 'badge-success' : 'badge-warning';
         const productGroup = String(product.productGroup || 'other');
         const productGroupLabel = product.productGroupLabel || productGroup;
         const groupBadgeClass = productGroup === 'pistol-parts'
@@ -2262,14 +2311,21 @@
               : 'badge-warning';
         const itemNumber = product.id || 'N/A';
         const productId = product.id || product.url || product.itemNumber;
+        const rowId = btoa(productId).replace(/=/g, '');
+        const sku = product.sku || 'N/A';
+        const isSelected = selectedProducts.has(productId);
         
         return `
-          <tr id="product-row-${btoa(productId).replace(/=/g, '')}">
+          <tr id="product-row-${rowId}" style="${isSelected ? 'background-color: #dbeafe;' : ''}">
+            <td style="text-align: center; width: 40px;">
+              <input type="checkbox" class="product-checkbox" data-product-id="${productId}" data-sku="${sku}" 
+                onchange="updateProductSelection()" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+            </td>
             <td>
               ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '📦'}
             </td>
             <td><strong>${itemNumber}</strong></td>
-            <td><strong>${product.sku || 'N/A'}</strong></td>
+            <td><strong>${sku}</strong></td>
             <td style="max-width: 300px;">${product.title || 'Untitled'}</td>
             <td><span class="badge ${groupBadgeClass}">${productGroupLabel}</span></td>
             <td style="font-size: 12px; color: #6b7280;">${product.ebayCategoryId || product.categoryId || '-'}</td>
@@ -2285,12 +2341,12 @@
                   </button>
                 ` : ''}
                 ${product.url ? `
-                  <button class="btn btn-sm btn-secondary" onclick="viewScrapedData('${productId}')" title="View Scraped Data">
+                  <button class="btn btn-sm btn-secondary" onclick="viewScrapedData('${productId.replace(/'/g, "\\'")}')" title="View Scraped Data">
                     📄 Data
                   </button>
                 ` : ''}
                 ${product.url ? `
-                  <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="rescrapeProduct('${productId}')" title="Re-scrape and Enrich">
+                  <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="rescrapeProduct('${productId.replace(/'/g, "\\'")}')" title="Re-scrape and Enrich">
                     🔄 Scrape
                   </button>
                 ` : ''}
@@ -2304,19 +2360,19 @@
                     🌐 Prod
                   </button>
                 ` : ''}
-                <button class="btn btn-sm" style="background: #8b5cf6; color: white;" onclick="openEditProductDimensionsModal('${productId}')" title="Edit Weight & Dimensions">
+                <button class="btn btn-sm" style="background: #8b5cf6; color: white;" onclick="openEditProductDimensionsModal('${productId.replace(/'/g, "\\'")}')" title="Edit Weight & Dimensions">
                   ⚖️ Dims
                 </button>
-                <button class="btn btn-sm" style="background: #0ea5e9; color: white;" onclick="openProductActivityLog('${productId}', '${product.title?.replace(/'/g, "\\'")}' || 'Product')" title="View Activity Log">
+                <button class="btn btn-sm" style="background: #0ea5e9; color: white;" onclick="openProductActivityLog('${productId.replace(/'/g, "\\'")}', '${(product.title || '').replace(/'/g, "\\'")}' || 'Product')" title="View Activity Log">
                   📋 Activity
                 </button>
-                <button class="btn btn-sm btn-primary" onclick="publishProduct('${productId}')" title="Publish using active Stage/Prod mode">
+                <button class="btn btn-sm btn-primary" onclick="publishProduct('${productId.replace(/'/g, "\\'")}')" title="Publish using active Stage/Prod mode">
                   📤 Active (${getActivePublishLabel()})
                 </button>
-                <button class="btn btn-sm" style="background: #6366f1; color: white;" onclick="publishProduct('${productId}', 'sandbox')" title="Force publish to Sandbox">
+                <button class="btn btn-sm" style="background: #6366f1; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'sandbox')" title="Force publish to Sandbox">
                   📦 Force Sandbox
                 </button>
-                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="publishProduct('${productId}', 'production')" title="Force publish to Production">
+                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'production')" title="Force publish to Production">
                   🌐 Force Prod
                 </button>
               </div>
@@ -2861,16 +2917,17 @@
     }
 
     // Publish Product (active Stage/Prod mode or explicit environment)
-    async function publishProduct(productId, environment) {
+    async function publishProduct(productId, environment, options = {}) {
       const statusId = 'status-' + btoa(productId).replace(/=/g, '');
       const resolvedEnvironment = environment || getActiveEbayEnvironment();
       const envLabel = resolvedEnvironment === 'sandbox' ? 'Sandbox' : 'Production';
       const usingActiveMode = !environment;
       const modeLabel = runtimeEnvironmentState.mode === 'prod' ? 'Prod' : 'Stage';
+      const skipConfirm = options.skipConfirm === true;
       
       const confirmMessage = `Publish this product to eBay ${envLabel}${usingActiveMode ? ` (${modeLabel} mode)` : ''}?<br><br>${resolvedEnvironment === 'production' ? '⚠️ <strong>WARNING: This will publish to LIVE eBay!</strong><br><br>' : ''}Continue?`;
-      if (!await showConfirm(confirmMessage, 'Publish to eBay')) {
-        return;
+      if (!skipConfirm && !await showConfirm(confirmMessage, 'Publish to eBay')) {
+        return { success: false, cancelled: true };
       }
       
       try {
@@ -2896,12 +2953,15 @@
           const listingLink = result.listingLink || result.link;
           showStatus(statusId, 'success', `✓ Published to ${envLabel}! <a href="${listingLink}" target="_blank" style="color: white; text-decoration: underline;">View Listing</a>`);
           setTimeout(() => loadProducts(), 1500);
+          return { success: true, result };
         } else {
           showStatus(statusId, 'error', `✗ Failed: ${result.error || result.message}`);
+          return { success: false, error: result.error || result.message || 'Publish failed', result };
         }
       } catch (error) {
         console.error(`Error publishing to ${resolvedEnvironment}:`, error);
         showStatus(statusId, 'error', '✗ Failed: ' + error.message);
+        return { success: false, error: error.message || 'Publish failed' };
       }
     }
 
@@ -3284,7 +3344,7 @@
             p.id && p.id !== 'unknown' &&
             p.title && p.price && p.description &&
             p.ebayCategoryId && p.ebayCategoryId !== 'N/A' &&
-            p.images && p.images.length > 0 &&
+            p.imageSourceUrls && p.imageSourceUrls.length > 0 &&
             p.inventory > 0
           ).length;
           document.getElementById('stat-inventory').textContent = activeOnEbay;
@@ -3564,8 +3624,8 @@
                 const result = item.result;
                 return `
                   <div style="background: white; border: 1px solid #c8e6c9; border-radius: 4px; padding: 12px;">
-                    ${result.images && result.images.length > 0 ? 
-                      `<img src="http://localhost:3001/${result.images[0]}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
+                    ${result.imageSourceUrls && result.imageSourceUrls.length > 0 ? 
+                      `<img src="http://localhost:3001${result.imageSourceUrls[0]}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px; margin-bottom: 8px;" alt="">` 
                       : '<div style="width: 100%; height: 140px; background: #f0f0f0; border-radius: 4px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">📦</div>'}
                     <strong style="display: block; margin-bottom: 4px; font-size: 13px;">${result.title || 'Untitled'}</strong>
                     <span style="display: block; color: #1976d2; margin-bottom: 4px; font-weight: bold; font-size: 14px;">$${typeof result.price === 'number' ? result.price.toFixed(2) : 'N/A'}</span>
@@ -4062,6 +4122,180 @@
     // Refresh orders (force refresh cache)
     async function refreshOrders() {
       await loadOrders(true);
+    }
+
+    // ============================================================================
+    // BULK PRODUCT OPERATIONS
+    // ============================================================================
+    
+    // Track selected products
+    let selectedProducts = new Set();
+
+    function updateProductSelection() {
+      selectedProducts.clear();
+      document.querySelectorAll('.product-checkbox:checked').forEach(checkbox => {
+        selectedProducts.add(checkbox.dataset.productId);
+      });
+      updateBulkActionsBar();
+    }
+
+    function toggleSelectAllProducts() {
+      const checkbox = document.getElementById('selectAllProducts');
+      selectedProducts.clear();
+      if (checkbox.checked) {
+        document.querySelectorAll('.product-checkbox').forEach(cb => {
+          cb.checked = true;
+          selectedProducts.add(cb.dataset.productId);
+        });
+      } else {
+        document.querySelectorAll('.product-checkbox').forEach(cb => {
+          cb.checked = false;
+        });
+      }
+      updateBulkActionsBar();
+    }
+
+    function clearProductSelection() {
+      selectedProducts.clear();
+      document.getElementById('selectAllProducts').checked = false;
+      document.querySelectorAll('.product-checkbox').forEach(cb => cb.checked = false);
+      updateBulkActionsBar();
+    }
+
+    function updateBulkActionsBar() {
+      const bar = document.getElementById('bulkActionsBar');
+      const count = document.getElementById('selectedCount');
+      const selected = selectedProducts.size;
+      
+      if (selected > 0) {
+        bar.style.display = 'block';
+        count.textContent = `${selected} item${selected !== 1 ? 's' : ''} selected`;
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    // Single product action functions
+    async function scrapeProductByLink(url) {
+      if (!url) {
+        showToast('No URL available for this product', 'warning');
+        return;
+      }
+      // Find the product by URL and rescrape it
+      const product = filteredProducts.find(p => p.url === url);
+      if (product) {
+        const productId = product.id || product.url;
+        await rescrapeProduct(productId);
+      } else {
+        showToast('Product not found', 'error');
+      }
+    }
+
+    async function publishProductToEbay(productId) {
+      // Publish with active environment (uses current mode)
+      await publishProduct(productId);
+    }
+
+    async function bulkScrapeProducts() {
+      if (selectedProducts.size === 0) {
+        showToast('Please select at least one product to scrape', 'warning');
+        return;
+      }
+
+      const skus = Array.from(selectedProducts).map(pid => {
+        const product = allProducts.find(p => (p.id || p.url || p.itemNumber) === pid);
+        return product ? (product.sku || product.customLabel || pid) : pid;
+      }).filter(Boolean);
+
+      if (!await showConfirm(`Scrape ${skus.length} selected product${skus.length !== 1 ? 's' : ''}?`, 'Start Bulk Scrape')) {
+        return;
+      }
+
+      const progressBar = document.getElementById('bulkProgressBar');
+      const progress = document.getElementById('bulkProgress');
+      const progressText = document.getElementById('bulkProgressText');
+      const scrapeBtn = document.getElementById('bulkScrapeBtn');
+      
+      progressBar.style.display = 'block';
+      scrapeBtn.disabled = true;
+
+      let completed = 0;
+      const total = selectedProducts.size;
+      
+      for (const productId of selectedProducts) {
+        try {
+          await rescrapeProduct(productId);
+          completed++;
+          const percent = Math.round((completed / total) * 100);
+          progress.style.width = percent + '%';
+          progressText.textContent = `Scraped ${completed}/${total} (${percent}%)`;
+        } catch (error) {
+          console.error('Error scraping product:', error);
+        }
+      }
+
+      showToast(`✓ Scraping complete! ${completed}/${total} products updated`, 'success');
+      progressBar.style.display = 'none';
+      scrapeBtn.disabled = false;
+      clearProductSelection();
+      loadProducts();
+    }
+
+    async function bulkPublishProducts() {
+      if (selectedProducts.size === 0) {
+        showToast('Please select at least one product to publish', 'warning');
+        return;
+      }
+
+      const skus = Array.from(selectedProducts).map(pid => {
+        const product = allProducts.find(p => (p.id || p.url || p.itemNumber) === pid);
+        return product ? (product.sku || product.customLabel || pid) : pid;
+      }).filter(Boolean);
+
+      const env = getActiveEbayEnvironment();
+      if (!await showConfirm(`Publish ${skus.length} selected product${skus.length !== 1 ? 's' : ''} to eBay ${env === 'production' ? '(PRODUCTION)' : '(Sandbox)'}?`, 'Bulk Publish to eBay')) {
+        return;
+      }
+
+      const progressBar = document.getElementById('bulkProgressBar');
+      const progress = document.getElementById('bulkProgress');
+      const progressText = document.getElementById('bulkProgressText');
+      const publishBtn = document.getElementById('bulkPublishBtn');
+      
+      progressBar.style.display = 'block';
+      publishBtn.disabled = true;
+
+      let completed = 0;
+      let failed = 0;
+      const total = selectedProducts.size;
+      
+      for (const productId of selectedProducts) {
+        const publishOutcome = await publishProduct(productId, env, { skipConfirm: true });
+        if (publishOutcome && publishOutcome.success) {
+          completed++;
+        } else if (publishOutcome && publishOutcome.cancelled) {
+          // In bulk mode, skipConfirm is true, so this should not happen.
+          failed++;
+        } else {
+          failed++;
+          if (publishOutcome && publishOutcome.error) {
+            console.error('Error publishing product:', publishOutcome.error);
+          }
+        }
+        const percent = Math.round(((completed + failed) / total) * 100);
+        progress.style.width = percent + '%';
+        progressText.textContent = `Published ${completed}/${total}, Failed: ${failed} (${percent}%)`;
+      }
+
+      const message = failed > 0 
+        ? `⚠ Publishing complete! ${completed}/${total} published, ${failed} failed`
+        : `✓ Publishing complete! All ${completed} products published`;
+      
+      showToast(message, failed > 0 ? 'warning' : 'success');
+      progressBar.style.display = 'none';
+      publishBtn.disabled = false;
+      clearProductSelection();
+      loadProducts();
     }
 
     // ============================================================================

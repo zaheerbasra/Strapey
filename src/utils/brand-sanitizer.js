@@ -67,6 +67,20 @@ function sanitizeBrandNames(text, options = {}) {
 }
 
 /**
+ * Remove trademark symbols used in listing copy.
+ */
+function stripTrademarkSymbols(text) {
+  if (!text || typeof text !== 'string') {
+    return text || '';
+  }
+
+  return text
+    .replace(/™/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Sanitize product title - remove brands and add Strapey if not present
  */
 function sanitizeTitle(title) {
@@ -84,6 +98,7 @@ function sanitizeTitle(title) {
 
   // Clean up and return
   return sanitized
+    .replace(/™/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -99,7 +114,7 @@ function sanitizeDescription(description) {
   // Remove competitor brands and replace with Strapey
   let sanitized = sanitizeBrandNames(description, { replaceWithStrapey: true });
 
-  return sanitized;
+  return stripTrademarkSymbols(sanitized);
 }
 
 /**
@@ -171,6 +186,7 @@ function escapeRegex(str) {
 
 module.exports = {
   sanitizeBrandNames,
+  stripTrademarkSymbols,
   sanitizeTitle,
   sanitizeDescription,
   sanitizeItemSpecifics,

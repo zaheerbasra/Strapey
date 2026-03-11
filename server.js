@@ -16,7 +16,7 @@ const { registerWordpressIntegrationRoutes } = require('./src/integrations/wordp
 const { applyProductGroup, detectProductGroup, getProductGroupLabel } = require('./src/utils/product-grouping');
 const { generateBrandedDescription, generateSeoTitle, getBrandConfig } = require('./src/utils/brand-content');
 const { addWatermark, isWatermarkingEnabled, getWatermarkSettings } = require('./src/utils/image-watermark');
-const { sanitizeProduct, sanitizeTitle, sanitizeDescription } = require('./src/utils/brand-sanitizer');
+const { sanitizeProduct, sanitizeTitle, sanitizeDescription, stripTrademarkSymbols } = require('./src/utils/brand-sanitizer');
 const { cleanProductImage } = require('./src/utils/image-cleaner');
 
 const app = express();
@@ -195,6 +195,10 @@ app.use(express.static('public'));
 // Ensure data folder exists
 fs.ensureDirSync('data');
 app.use('/data', express.static(path.join(__dirname, 'data')));
+
+// Serve SKU-based product images
+fs.ensureDirSync(path.join('data', 'images'));
+app.use('/images', express.static(path.join(__dirname, 'data', 'images')));
 
 const DATA_FILE_PATH = path.join('data', 'data.json');
 const ADMIN_CONFIG_PATH = path.join('data', 'admin-config.json');
@@ -496,6 +500,13 @@ app.get('/api/products', (req, res) => {
     const allData = fs.readJsonSync(DATA_FILE_PATH);
     const products = Object.values(allData).map((product) => {
       const grouped = applyProductGroup(product || {});
+      const isPublished = Boolean(
+        grouped.publishedToProduction ||
+        grouped.productionListingId ||
+        grouped.productionLink ||
+        grouped.publishedLink ||
+        grouped.sandboxListingId
+      );
       return {
         id: grouped.itemNumber || grouped.sku || grouped.customLabel || 'unknown',
         sku: grouped.sku || grouped.customLabel,
@@ -503,9 +514,18 @@ app.get('/api/products', (req, res) => {
         price: grouped.price,
         currency: grouped.currency || 'USD',
         description: grouped.description,
-        images: grouped.imagesOriginal || grouped.images || [],
+        imageSourceUrls: grouped.imageSourceUrls || grouped.images || grouped.imagesOriginal || [],
+        images: grouped.imageSourceUrls || grouped.images || grouped.imagesOriginal || [],
         url: grouped.url,
         publishedLink: grouped.publishedLink,
+        sandboxListingId: grouped.sandboxListingId || null,
+        productionLink: grouped.productionLink || null,
+        productionListingId: grouped.productionListingId || null,
+        publishedToProduction: Boolean(grouped.publishedToProduction),
+        publishStatus: grouped.publishStatus || (isPublished ? 'Published' : 'Draft'),
+        latestPublishedListingId: grouped.latestPublishedListingId || grouped.productionListingId || grouped.sandboxListingId || null,
+        latestPublishedLink: grouped.latestPublishedLink || grouped.productionLink || grouped.publishedLink || null,
+        lastPublishEnvironment: grouped.lastPublishEnvironment || (grouped.productionLink || grouped.productionListingId ? 'production' : (grouped.publishedLink || grouped.sandboxListingId ? 'sandbox' : null)),
         listingId: grouped.listingId,
         inventory: grouped.inventoryQuantity ?? grouped.availableQuantity ?? grouped.inventory ?? 0,
         lastUpdated: grouped.lastUpdated,
@@ -811,10 +831,16 @@ app.put('/api/products/:id', async (req, res) => {
     
     // Update product fields
     const product = allData[productKey];
-    if (req.body.title !== undefined) product.title = req.body.title;
+    if (req.body.title !== undefined) product.title = sanitizeTitle(String(req.body.title || ''));
     if (req.body.price !== undefined) product.price = req.body.price;
     if (req.body.inventory !== undefined) product.inventoryQuantity = req.body.inventory;
-    if (req.body.description !== undefined) product.description = req.body.description;
+    if (req.body.description !== undefined) {
+      if (Array.isArray(req.body.description)) {
+        product.description = req.body.description.map((line) => sanitizeDescription(String(line || '')));
+      } else {
+        product.description = sanitizeDescription(String(req.body.description || ''));
+      }
+    }
     if (req.body.productGroup !== undefined) product.productGroup = req.body.productGroup;
     
     // Weight and dimensions support
@@ -941,6 +967,9 @@ app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
       removeBrandPatterns.forEach(pattern => {
         optimized = optimized.replace(pattern, '');
       });
+
+      // Remove trademark symbols across both title and description
+      optimized = stripTrademarkSymbols(optimized);
       
       // Clean up extra spaces and punctuation
       optimized = optimized.replace(/\s+/g, ' ').trim();
@@ -1143,8 +1172,8 @@ app.get('/api/products/:id/scraped-data', (req, res) => {
         description: grouped.description,
         price: grouped.price,
         currency: grouped.currency,
-        images: grouped.imageSourceUrls || grouped.images || [],
-        localImages: grouped.images || [],
+        images: grouped.imageSourceUrls || grouped.images || grouped.imagesOriginal || [],
+        localImages: grouped.imageSourceUrls || grouped.images || grouped.imagesOriginal || [],
         itemSpecifics: grouped.itemSpecifics || {},
         condition: grouped.condition,
         lastScrapedAt: grouped.lastScrapedAt,
@@ -1250,6 +1279,14 @@ app.post('/api/products/:id/publish/production', async (req, res) => {
       allData[productKey].productionLink = result.listingLink;
       allData[productKey].productionListingId = result.listingId;
       allData[productKey].publishedToProduction = true;
+      allData[productKey].publishStatus = 'Published';
+      allData[productKey].status = 'Published';
+      allData[productKey].latestPublishedListingId = result.listingId || null;
+      allData[productKey].latestPublishedLink = result.listingLink || null;
+      allData[productKey].lastPublishEnvironment = 'production';
+      allData[productKey].lastPublishedListingId = result.listingId || null;
+      allData[productKey].lastPublishedLink = result.listingLink || null;
+      allData[productKey].lastPublishedItemNumber = result.listingId || null;
       allData[productKey].lastPublishedToProdAt = new Date().toISOString();
       fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
 
@@ -1302,10 +1339,26 @@ app.post('/api/products/:id/publish/active', async (req, res) => {
         allData[productKey].productionLink = result.listingLink;
         allData[productKey].productionListingId = result.listingId;
         allData[productKey].publishedToProduction = true;
+        allData[productKey].publishStatus = 'Published';
+        allData[productKey].status = 'Published';
+        allData[productKey].latestPublishedListingId = result.listingId || null;
+        allData[productKey].latestPublishedLink = result.listingLink || null;
+        allData[productKey].lastPublishEnvironment = 'production';
+        allData[productKey].lastPublishedListingId = result.listingId || null;
+        allData[productKey].lastPublishedLink = result.listingLink || null;
+        allData[productKey].lastPublishedItemNumber = result.listingId || null;
         allData[productKey].lastPublishedToProdAt = new Date().toISOString();
       } else {
         allData[productKey].publishedLink = result.listingLink;
         allData[productKey].sandboxListingId = result.listingId;
+        allData[productKey].publishStatus = 'Published';
+        allData[productKey].status = 'Published';
+        allData[productKey].latestPublishedListingId = result.listingId || null;
+        allData[productKey].latestPublishedLink = result.listingLink || null;
+        allData[productKey].lastPublishEnvironment = 'sandbox';
+        allData[productKey].lastPublishedListingId = result.listingId || null;
+        allData[productKey].lastPublishedLink = result.listingLink || null;
+        allData[productKey].lastPublishedItemNumber = result.listingId || null;
         allData[productKey].lastPublishedAt = new Date().toISOString();
       }
       allData[productKey].publishAction = runtimeMode;
@@ -2048,31 +2101,139 @@ function forceNewConditionDefaults(product = {}) {
   return normalized;
 }
 
-async function prepareListingImageUrls({ imageSourceUrls, token, logger, requireEps = true }) {
-  const validated = validateImageUrls(Array.isArray(imageSourceUrls) ? imageSourceUrls : []);
+async function extractEbayImageUrlsFromListing(productUrl, logger = null) {
+  if (!productUrl || !/^https?:\/\//i.test(String(productUrl))) return [];
+  try {
+    const response = await axios.get(String(productUrl), {
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+      }
+    });
+    const html = String(response.data || '');
+    const matches = html.match(/https?:\/\/i\.ebayimg\.com\/images\/[^"'\s<>)]+/gi) || [];
+    const unique = Array.from(new Set(matches.map((u) => u.replace(/&amp;/g, '&').trim())));
+    const cleaned = validateEbayHostedImageUrls(unique);
+    if (logger) logger.info('Recovered eBay-hosted images from listing page', {
+      sourceUrl: productUrl,
+      discovered: unique.length,
+      usable: cleaned.length
+    });
+    return cleaned;
+  } catch (error) {
+    if (logger) logger.warn('Failed to recover eBay-hosted images from listing page', {
+      sourceUrl: productUrl,
+      error: error.message
+    });
+    return [];
+  }
+}
 
-  if (!validated.length) {
-    throw new Error('Cannot publish: no valid source images after validation.');
+async function extractEbayImageUrlsFromItemId(itemId, token, logger = null) {
+  if (!itemId) return [];
+  try {
+    const { tradingBase } = getEbayBaseUrls();
+    const runtime = getRuntimeConfig();
+    const compatibilityLevel = runtime.ebay.compatibilityLevel || '1231';
+    const siteId = runtime.ebay.siteId || '0';
+    const xmlBody = `<?xml version="1.0" encoding="utf-8"?>\n<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">\n  <ErrorLanguage>en_US</ErrorLanguage>\n  <WarningLevel>High</WarningLevel>\n  <DetailLevel>ReturnAll</DetailLevel>\n  <ItemID>${escapeXml(String(itemId))}</ItemID>\n</GetItemRequest>`;
+
+    const response = await axios.post(tradingBase, xmlBody, {
+      headers: {
+        'Content-Type': 'text/xml',
+        'X-EBAY-API-COMPATIBILITY-LEVEL': compatibilityLevel,
+        'X-EBAY-API-DEV-NAME': process.env.EBAY_DEV_ID || '',
+        'X-EBAY-API-APP-NAME': process.env.EBAY_CLIENT_ID || '',
+        'X-EBAY-API-CERT-NAME': process.env.EBAY_CERT_ID || '',
+        'X-EBAY-API-SITEID': siteId,
+        'X-EBAY-API-CALL-NAME': 'GetItem',
+        'X-EBAY-API-IAF-TOKEN': token
+      },
+      timeout: 30000
+    });
+
+    const xml = String(response.data || '');
+    const matches = [...xml.matchAll(/<PictureURL>(.*?)<\/PictureURL>/g)].map((m) => String(m[1] || '').trim());
+    const cleaned = validateEbayHostedImageUrls(Array.from(new Set(matches)));
+    if (logger) logger.info('Recovered eBay-hosted images from Trading GetItem', {
+      itemId: String(itemId),
+      discovered: matches.length,
+      usable: cleaned.length
+    });
+    return cleaned;
+  } catch (error) {
+    if (logger) logger.warn('Failed to recover eBay-hosted images from Trading GetItem', {
+      itemId: String(itemId),
+      error: error.message
+    });
+    return [];
+  }
+}
+
+async function prepareListingImageUrls({ imageSourceUrls, remoteImageUrls = [], productUrl = '', itemId = '', token, logger, requireEps = true }) {
+  const validatedSource = validateSourceImageUrls(Array.isArray(imageSourceUrls) ? imageSourceUrls : []);
+  const validatedRemote = validateEbayHostedImageUrls(Array.isArray(remoteImageUrls) ? remoteImageUrls : []);
+  const validatedSourceEbay = validateEbayHostedImageUrls(validatedSource);
+
+  let ebayHostedCandidates = Array.from(new Set([
+    ...validatedRemote,
+    ...validatedSourceEbay
+  ])).slice(0, 24);
+
+  if (!ebayHostedCandidates.length && itemId) {
+    const recoveredByItem = await extractEbayImageUrlsFromItemId(itemId, token, logger);
+    ebayHostedCandidates = Array.from(new Set(recoveredByItem)).slice(0, 24);
+  }
+
+  if (!ebayHostedCandidates.length && productUrl) {
+    const recovered = await extractEbayImageUrlsFromListing(productUrl, logger);
+    ebayHostedCandidates = Array.from(new Set(recovered)).slice(0, 24);
+  }
+  
+  if (logger) {
+    logger.info('Image preparation started', {
+      input: Array.isArray(imageSourceUrls) ? imageSourceUrls.length : 0,
+      validatedSource: validatedSource.length,
+      validatedRemote: validatedRemote.length,
+      ebayHostedCandidates: ebayHostedCandidates.length,
+      requireEps
+    });
+  }
+
+  if (!ebayHostedCandidates.length) {
+    throw new Error('Cannot publish: no eBay-hosted images available. Rescrape the product to recover eBay image URLs.');
   }
 
   if (!requireEps) {
+    if (logger) logger.info('EPS upload skipped (requireEps=false)');
     return {
-      sourceImageUrls: validated,
-      listingImageUrls: validated,
+      sourceImageUrls: validatedSource,
+      listingImageUrls: ebayHostedCandidates,
       epsEnabled: false,
       uploadedToEps: false
     };
   }
 
-  const hosted = await convertToEbayHostedImageUrls(validated, token, logger);
-  const validHosted = validateImageUrls(hosted);
+  // Existing approach policy: do NOT attach public-domain URLs; keep only eBay-hosted image URLs.
+  // We still normalize through EPS when available, but reject non-ebay fallbacks.
+  if (logger) logger.info('Starting EPS upload using eBay-hosted candidates only', { imageCount: ebayHostedCandidates.length });
+  const hosted = await convertToEbayHostedImageUrls(ebayHostedCandidates, token, logger);
+  const validHosted = validateEbayHostedImageUrls(hosted.length ? hosted : ebayHostedCandidates);
+  
+  if (logger) {
+    logger.info('EPS upload completed', {
+      uploaded: hosted.length,
+      valid: validHosted.length,
+      failed: hosted.length - validHosted.length
+    });
+  }
 
   if (!validHosted.length) {
     throw new Error('Cannot publish: image hosting/enhancement failed, no valid listing images available.');
   }
 
   return {
-    sourceImageUrls: validated,
+    sourceImageUrls: validatedSource,
     listingImageUrls: validHosted,
     epsEnabled: true,
     uploadedToEps: true
@@ -2155,7 +2316,32 @@ const MARKETING_STOP_WORDS = new Set([
   'listing', 'ebay', 'size', 'type', 'color', 'steel', 'knife'
 ]);
 
-function validateImageUrls(imageUrls) {
+function validateSourceImageUrls(imageUrls) {
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0) return [];
+
+  const filtered = imageUrls.filter((url) => {
+    try {
+      if (!url || typeof url !== 'string') return false;
+      
+      // Accept local paths (relative URLs)
+      if (url.startsWith('/images/')) return true;
+      
+      // Accept full eBay URLs
+      if (url.includes('ebayimg.com')) return true;
+      
+      // Accept other HTTP(S) URLs
+      if (/^https?:\/\//i.test(url)) return true;
+      
+      return false;
+    } catch (e) {
+      return false;
+    }
+  });
+
+  return filtered.slice(0, 24); // Max 24 images
+}
+
+function validateEbayHostedImageUrls(imageUrls) {
   if (!Array.isArray(imageUrls) || imageUrls.length === 0) return [];
 
   const filtered = imageUrls.filter((url) => {
@@ -2165,7 +2351,7 @@ function validateImageUrls(imageUrls) {
       if (!url.includes('ebayimg.com')) return false;
 
       // Filter out thumbnail sizes
-      if (/s-l(50|100|140|200)\./.test(url)) return false;
+      if (/s-l(50|100|140|200)\./. test(url)) return false;
 
       // Filter out suspicious file types
       if (/\.(gif|bmp|ico|svg)$/i.test(url)) return false;
@@ -2751,16 +2937,44 @@ async function uploadImageUrlToEbayEps(imageUrl, token) {
 }
 
 async function convertToEbayHostedImageUrls(imageUrls, token, logger = null) {
-  const hosted = await mapWithConcurrency(imageUrls, EPS_UPLOAD_CONCURRENCY, async (imageUrl) => {
+  if (logger) {
+    logger.info('EPS batch upload starting', { 
+      totalImages: imageUrls.length,
+      concurrency: EPS_UPLOAD_CONCURRENCY 
+    });
+  }
+  
+  let successCount = 0;
+  let failureCount = 0;
+  
+  const hosted = await mapWithConcurrency(imageUrls, EPS_UPLOAD_CONCURRENCY, async (imageUrl, index) => {
     try {
       const hostedUrl = await uploadImageUrlToEbayEps(imageUrl, token);
-      if (logger) logger.debug('EPS image uploaded', { source: imageUrl, hosted: hostedUrl });
+      successCount++;
+      if (logger && (index < 3 || index === imageUrls.length - 1)) {
+        logger.debug(`EPS image ${index + 1}/${imageUrls.length} uploaded`, { 
+          source: imageUrl.substring(0, 50) + '...', 
+          hosted: hostedUrl.substring(0, 50) + '...' 
+        });
+      }
       return hostedUrl;
     } catch (error) {
-      if (logger) logger.warn('EPS upload failed, falling back to source image URL', { source: imageUrl, error: error.message });
+      failureCount++;
+      if (logger) logger.warn(`EPS upload failed for image ${index + 1}/${imageUrls.length}, using fallback`, { 
+        source: imageUrl.substring(0, 50) + '...', 
+        error: error.message 
+      });
       return imageUrl;
     }
   });
+  
+  if (logger) {
+    logger.info('EPS batch upload completed', {
+      total: imageUrls.length,
+      success: successCount,
+      failed: failureCount
+    });
+  }
 
   return hosted;
 }
@@ -2855,6 +3069,7 @@ async function publishViaTradingApiFallback(productData, logger, overrides = {})
   });
 
   return {
+    success: true,
     offerId: null,
     sku: buildPublishSku(productData),
     listingId: result.listingId,
@@ -2883,7 +3098,15 @@ async function publishToEbay(productData, overrides = {}) {
       : (overrides || {});
     const ebayConfig = getEbayRuntimeConfig(resolvedOverrides);
     const normalizedProductData = forceNewConditionDefaults(productData || {});
-    logger.info('Starting publish process', { sku: normalizedProductData.customLabel });
+    const sku = normalizedProductData.customLabel || normalizedProductData.sku || 'UNKNOWN';
+    
+    logger.info('========================================');
+    logger.info('PUBLISH FLOW STARTED', { 
+      sku, 
+      environment: resolvedOverrides.environment || 'default',
+      imageCount: Array.isArray(normalizedProductData.imageSourceUrls) ? normalizedProductData.imageSourceUrls.length : 0
+    });
+    logger.info('========================================');
     
     // ==================================================================================
     // VALIDATE: Check content for scams, suspicious keywords, and malicious patterns
@@ -2904,29 +3127,50 @@ async function publishToEbay(productData, overrides = {}) {
     // VALIDATE: Check images for scams, logos, and suspicious patterns
     // ==================================================================================
     const sourceImageUrlsFromData = Array.isArray(normalizedProductData.imageSourceUrls) ? normalizedProductData.imageSourceUrls : [];
-    const validatedImages = validateImageUrls(sourceImageUrlsFromData);
+    const remoteImageUrlsFromData = Array.isArray(normalizedProductData.remoteImageUrls) ? normalizedProductData.remoteImageUrls : [];
+    logger.info('Step 1: Image validation started', { totalImages: sourceImageUrlsFromData.length });
     
-    if (validatedImages.length === 0) {
-      const errorMsg = 'Cannot publish: no valid product images. Images may have been filtered as suspicious.';
+    // Enforce eBay's 24-image limit BEFORE validation
+    const limitedImages = sourceImageUrlsFromData.slice(0, 24);
+    if (sourceImageUrlsFromData.length > 24) {
+      logger.warn('Image count exceeds eBay limit', {
+        original: sourceImageUrlsFromData.length,
+        limited: limitedImages.length,
+        dropped: sourceImageUrlsFromData.length - 24
+      });
+    }
+    
+    // Use source validation (accepts local paths)
+    const validatedImages = validateSourceImageUrls(limitedImages);
+    logger.info('Step 1: Image validation completed', { 
+      input: limitedImages.length, 
+      valid: validatedImages.length,
+      filtered: limitedImages.length - validatedImages.length
+    });
+    
+    if (validatedImages.length === 0 && remoteImageUrlsFromData.length === 0) {
+      const errorMsg = 'Cannot publish: no valid product images found in source or remote image sets.';
       logger.error(errorMsg);
       throw new Error(errorMsg);
     }
     
-    if (validatedImages.length < sourceImageUrlsFromData.length) {
-      const removed = sourceImageUrlsFromData.length - validatedImages.length;
+    if (validatedImages.length < limitedImages.length) {
+      const removed = limitedImages.length - validatedImages.length;
       logger.warn('Suspicious images removed', { 
-        total: sourceImageUrlsFromData.length, 
+        afterLimit: limitedImages.length, 
         valid: validatedImages.length,
         removed 
       });
     }
     
+    logger.info('Step 2: Authenticating with eBay');
     const token = await getEbayAccessToken(resolvedOverrides);
     const ebayEnvironment = resolveEbayEnvironment(resolvedOverrides);
     const { apiBase, listingBase } = getEbayBaseUrls({ environment: ebayEnvironment });
+    logger.info('Step 2: Authentication successful', { environment: ebayEnvironment });
 
     const marketplaceId = resolvedOverrides.marketplaceId || ebayConfig.marketplaceId || 'EBAY_US';
-    logger.debug('Marketplace ID', { marketplaceId });
+    logger.info('Step 3: Configuration loaded', { marketplaceId });
     
     // Category must come from product data (or explicit request override) in production.
     // Prefer eBay-specific field first; many imported products store the value in ebayCategoryId.
@@ -2946,11 +3190,12 @@ async function publishToEbay(productData, overrides = {}) {
     const returnPolicyId = ebayConfig.returnPolicyId;
     const merchantLocationKey = ebayConfig.locationKey || 'des-plaines-il-primary';
 
-    logger.debug('Policy IDs', {
-      categoryId,
+    logger.info('Step 4: Business policies validated', {
+      categoryId: categoryId || 'NOT_SET',
       fulfillmentPolicyId: fulfillmentPolicyId ? 'SET' : 'MISSING',
       paymentPolicyId: paymentPolicyId ? 'SET' : 'MISSING',
-      returnPolicyId: returnPolicyId ? 'SET' : 'MISSING'
+      returnPolicyId: returnPolicyId ? 'SET' : 'MISSING',
+      merchantLocationKey
     });
 
     if (!categoryId || !fulfillmentPolicyId || !paymentPolicyId || !returnPolicyId) {
@@ -2965,7 +3210,7 @@ async function publishToEbay(productData, overrides = {}) {
       throw new Error(errorMsg);
     }
 
-    const sku = buildPublishSku(normalizedProductData);
+    // Note: sku already declared at top of function - no need to redeclare
     const quantity = parseQuantity(
       normalizedProductData.inventoryQuantity ??
       normalizedProductData.availableQuantity ??
@@ -2998,6 +3243,9 @@ async function publishToEbay(productData, overrides = {}) {
       logger.info('Hosted image pipeline enabled. Uploading images to eBay Picture Services...');
       const preparedImages = await prepareListingImageUrls({
         imageSourceUrls: sourceImageUrls,
+        remoteImageUrls: remoteImageUrlsFromData,
+        productUrl: normalizedProductData.url || normalizedProductData.link || '',
+        itemId: normalizedProductData.itemNumber || normalizedProductData.id || '',
         token,
         logger,
         requireEps: true
@@ -3411,7 +3659,18 @@ async function publishToEbay(productData, overrides = {}) {
       }
     }
 
+    logger.info('========================================');
+    logger.info('PUBLISH FLOW COMPLETED SUCCESSFULLY', { 
+      sku, 
+      listingId, 
+      listingLink,
+      quantity,
+      imageCount: validatedImages.length
+    });
+    logger.info('========================================');
+    
     return {
+      success: true,
       offerId,
       sku,
       listingId,
@@ -3426,11 +3685,23 @@ async function publishToEbay(productData, overrides = {}) {
       logs: logger.getLogs()
     };
   } catch (error) {
+    const errorSku = productData?.customLabel || productData?.sku || 'UNKNOWN';
+    logger.error('========================================');
+    logger.error('PUBLISH FLOW FAILED', { 
+      sku: errorSku,
+      error: error.message,
+      stack: error.stack?.split('\n').slice(0, 3).join(' | ')
+    });
+    logger.error('========================================');
+    
     if (isEbayAccessDeniedError(error)) {
+      logger.info('Attempting Trading API fallback...');
       try {
         const fallbackResult = await publishViaTradingApiFallback(productData, logger, resolvedOverrides);
+        logger.info('Trading API fallback succeeded');
         return {
           ...fallbackResult,
+          success: true,
           logs: logger.getLogs()
         };
       } catch (fallbackError) {
@@ -5443,6 +5714,133 @@ async function retryFailedScrapes() {
 // Start retry cron job (every 10 minutes)
 setInterval(retryFailedScrapes, 10 * 60 * 1000);
 
+function sanitizeSkuFolderName(value) {
+  return String(value || '').replace(/[^a-zA-Z0-9_-]/g, '').trim();
+}
+
+function toPublicSkuImagePath(skuFolder, filename) {
+  return `/images/${skuFolder}/${filename}`;
+}
+
+function migrateLegacyImagePathToSku(imagePath, skuFolder) {
+  const normalized = String(imagePath || '').trim();
+  if (!normalized) return normalized;
+
+  // Already in public SKU format
+  if (/^\/images\/[A-Za-z0-9_-]+\//.test(normalized)) {
+    return normalized;
+  }
+
+  const filename = path.basename(normalized);
+  if (!filename) return normalized;
+
+  const targetDir = path.join(__dirname, 'data', 'images', skuFolder);
+  fs.ensureDirSync(targetDir);
+
+  const sourceCandidates = [
+    path.join(__dirname, normalized.replace(/^\//, '')),
+    path.join(__dirname, 'data', normalized.replace(/^\/?data\//, ''))
+  ];
+
+  const sourcePath = sourceCandidates.find((candidate) => {
+    try {
+      return fs.existsSync(candidate);
+    } catch (_) {
+      return false;
+    }
+  });
+
+  const targetPath = path.join(targetDir, filename);
+  if (sourcePath && sourcePath !== targetPath) {
+    try {
+      fs.moveSync(sourcePath, targetPath, { overwrite: true });
+    } catch (_) {
+      // Keep normalization best-effort; path will still be rewritten.
+    }
+  }
+
+  return toPublicSkuImagePath(skuFolder, filename);
+}
+
+function collectLegacyImagesForSku(skuFolder) {
+  const dataRoot = path.join(__dirname, 'data');
+  const targetDir = path.join(dataRoot, 'images', skuFolder);
+  fs.ensureDirSync(targetDir);
+
+  const migratedPublicPaths = [];
+  const entries = fs.readdirSync(dataRoot, { withFileTypes: true });
+  const hexDirs = entries.filter((entry) => entry.isDirectory() && /^[0-9a-f]{32}$/i.test(entry.name));
+
+  for (const dir of hexDirs) {
+    const legacyDir = path.join(dataRoot, dir.name);
+    let files = [];
+    try {
+      files = fs.readdirSync(legacyDir);
+    } catch (_) {
+      continue;
+    }
+
+    for (const file of files) {
+      // Match filenames created by scraper: Strapey_{SKU}_..._enhanced.webp
+      if (!new RegExp(`^Strapey_${skuFolder}_`, 'i').test(file)) {
+        continue;
+      }
+
+      const sourcePath = path.join(legacyDir, file);
+      const targetPath = path.join(targetDir, file);
+      try {
+        fs.moveSync(sourcePath, targetPath, { overwrite: true });
+        migratedPublicPaths.push(toPublicSkuImagePath(skuFolder, file));
+      } catch (_) {
+        // Best-effort migration.
+      }
+    }
+
+    // Remove empty legacy directory after migration.
+    try {
+      const remaining = fs.readdirSync(legacyDir);
+      if (remaining.length === 0) {
+        fs.removeSync(legacyDir);
+      }
+    } catch (_) {
+      // Ignore cleanup errors.
+    }
+  }
+
+  return migratedPublicPaths;
+}
+
+function normalizeProductImageStorage(product) {
+  const skuFolder = sanitizeSkuFolderName(product.sku || product.customLabel || product.itemNumber || 'NoSKU') || 'NoSKU';
+
+  const normalizeList = (list) => {
+    if (!Array.isArray(list)) return [];
+    const normalized = list
+      .map((img) => migrateLegacyImagePathToSku(img, skuFolder))
+      .filter(Boolean);
+    return Array.from(new Set(normalized));
+  };
+
+  const normalizedSource = normalizeList(product.imageSourceUrls);
+  const normalizedImages = normalizeList(product.images);
+  const normalizedOriginal = normalizeList(product.imagesOriginal);
+  const migratedFromLegacyFolders = collectLegacyImagesForSku(skuFolder);
+  const merged = Array.from(new Set([
+    ...normalizedSource,
+    ...normalizedImages,
+    ...normalizedOriginal,
+    ...migratedFromLegacyFolders
+  ]));
+
+  product.imageSourceUrls = merged;
+  product.images = merged;
+  product.imagesOriginal = merged;
+  product.imageFolderType = 'sku-based';
+  product.lastImageMapDate = new Date().toISOString();
+
+  return product;
+}
+
 // Save product to data.json with intelligent merging
 async function saveProductToData(productData) {
   try {
@@ -5471,7 +5869,7 @@ async function saveProductToData(productData) {
     
     // Intelligent merge: Keep ALL existing data, overlay new scraped data
     // CRITICAL: This preserves imported data (category IDs, pricing) while updating scraped content
-    const mergedProduct = applyProductGroup({
+    let mergedProduct = applyProductGroup({
       ...(existingProduct || {}),    // Start with ALL existing data
       ...productData,                 // Overlay new scraped data
       // Preserve critical imported fields if they exist and scraped data doesn't provide them
@@ -5485,6 +5883,9 @@ async function saveProductToData(productData) {
       // Track source
       source: isNewProduct ? 'scrape-new' : 'scrape-update'
     });
+
+    // Enforce SKU-based image storage and paths for every write.
+    mergedProduct = normalizeProductImageStorage(mergedProduct);
     
     // CRITICAL: ONLY upsert - never remove other products
     existingData[productKey] = mergedProduct;
@@ -6595,7 +6996,7 @@ app.post('/api/validate-and-clean-data', async (req, res) => {
 
       // Validate images
       if (Array.isArray(productData.imageSourceUrls) && productData.imageSourceUrls.length > 0) {
-        const validatedImages = validateImageUrls(productData.imageSourceUrls);
+        const validatedImages = validateSourceImageUrls(productData.imageSourceUrls);
         if (validatedImages.length < productData.imageSourceUrls.length) {
           const removed = productData.imageSourceUrls.length - validatedImages.length;
           itemResult.issues.push(`Removed ${removed} suspicious images`);
@@ -6928,7 +7329,7 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
         const images = collectImageCandidates();
         
         // VALIDATE IMAGES: Filter out scam, logos, and suspicious images
-        const validatedImages = validateImageUrls(images);
+        const validatedImages = validateSourceImageUrls(images);
         const imageValidationLog = {
           collected: images.length,
           filtered: validatedImages.length,
@@ -7117,20 +7518,27 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
           .substring(0, 50);                // Limit length to 50 chars
       };
 
-      // Download and enhance images
-      const productId = crypto.createHash('md5').update(url).digest('hex');
-      const productDir = path.join('data', productId);
+      // Download and enhance images into SKU-based folder structure
+      const sanitizeForPathSegment = (text) => {
+        return String(text || '')
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .trim();
+      };
+
+      const finalSku = sku || extractedData.customLabel || 'NoSKU';
+      const folderSku = sanitizeForPathSegment(finalSku) || 'NoSKU';
+      const productDir = path.join('data', 'images', folderSku);
       fs.ensureDirSync(productDir);
       console.log(`Created directory: ${productDir}`);
 
       // Determine SKU and title for filename
-      const finalSku = sku || extractedData.customLabel || 'NoSKU';
       const finalTitle = extractedData.title || 'Product';
       const seoSku = sanitizeForFilename(finalSku);
       const seoTitle = sanitizeForFilename(finalTitle);
 
       const imagesOriginal = [];
       const imagesEnhanced = [];
+      const imageSourceUrls = [];
       for (let i = 0; i < extractedData.images.length; i++) {
         const imgUrl = extractedData.images[i];
         const ext = path.extname(imgUrl) || '.jpg';
@@ -7152,11 +7560,13 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
           imagesOriginal.push(rawPath);
           const enhancedPath = await processAndReplaceImage(rawPath);
           imagesEnhanced.push(enhancedPath);
+          imageSourceUrls.push(`/images/${folderSku}/${path.basename(enhancedPath)}`);
           console.log(`Processed image ${i}`);
         } catch (e) {
           console.error(`Failed to download or process ${imgUrl}: ${e.message}`);
           if (fs.existsSync(rawPath)) {
             imagesEnhanced.push(rawPath);
+            imageSourceUrls.push(`/images/${folderSku}/${path.basename(rawPath)}`);
           }
         }
       }
@@ -7172,9 +7582,9 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
         category: scrapeContext.category || scrapeContext.ebayCategory || extractedData.category || '',
         ebayCategory: scrapeContext.category || scrapeContext.ebayCategory || extractedData.ebayCategory || '',
         ebayCategoryId: scrapeContext.categoryId || scrapeContext.ebayCategoryId || extractedData.ebayCategoryId || '',
-        imageSourceUrls: extractedData.images,
-        images: imagesEnhanced,
-        imagesOriginal,
+        imageSourceUrls,
+        images: imageSourceUrls,
+        imagesOriginal: imageSourceUrls,
         condition: 'NEW',
         conditionDisplay: 'New',
         lastUpdated: new Date().toISOString()
