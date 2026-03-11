@@ -657,6 +657,16 @@
   </style>
 </head>
 <body>
+    <!-- Order Details Modal -->
+    <div class="modal" id="orderDetailsModal">
+      <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+          <span>Order Details</span>
+          <button type="button" class="btn btn-secondary" onclick="closeModal('orderDetailsModal')" style="margin-left: auto;">✕</button>
+        </div>
+        <div id="orderDetailsContent" style="padding: 20px;"></div>
+      </div>
+    </div>
   <div class="layout">
     <!-- Header -->
     <header>
@@ -1158,13 +1168,17 @@
             <table style="width: 100%; border-collapse: collapse;">
               <thead>
                 <tr style="background: var(--bg-secondary); border-bottom: 2px solid var(--border-color);">
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Order ID</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Date</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Buyer</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Items</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Total</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Status</th>
-                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Payment</th>
+                  <th class="sortable" data-sort="orderId" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Order ID</th>
+                  <th class="sortable" data-sort="creationDate" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Date</th>
+                  <th class="sortable" data-sort="buyerId" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Buyer ID</th>
+                  <th class="sortable" data-sort="buyerName" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Buyer Name</th>
+                  <th class="sortable" data-sort="sku" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">SKU</th>
+                  <th class="sortable" data-sort="qty" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Qty</th>
+                  <th class="sortable" data-sort="orderEarnings" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Order Earnings</th>
+                  <th class="sortable" data-sort="ebayCharges" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">eBay Charges</th>
+                  <th class="sortable" data-sort="orderTotal" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Total</th>
+                  <th class="sortable" data-sort="status" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Status</th>
+                  <th class="sortable" data-sort="payment" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Payment</th>
                 </tr>
               </thead>
               <tbody id="orders-table-body">
@@ -4014,12 +4028,21 @@
         // Populate table
         tableContainer.style.display = 'block';
         tableBody.innerHTML = orders.map(order => {
-          const date = new Date(order.creationDate).toLocaleDateString();
-          const buyerName = order.buyer?.username || 'N/A';
-          const itemCount = order.lineItems?.length || 0;
-          const total = order.pricingSummary?.total?.value || '0.00';
-          const currency = order.pricingSummary?.total?.currency || 'USD';
-          
+          const orderId = order.orderId || 'N/A';
+          const orderDate = new Date(order.creationDate).toLocaleDateString();
+          const buyerId = order.buyer?.username || 'N/A';
+          const buyerName = order.shippingAddress?.fullName || order.buyer?.name || 'N/A';
+          const sku = order.lineItems?.[0]?.sku || 'N/A';
+          const qty = order.lineItems?.[0]?.quantity || 0;
+          const orderEarnings = order.orderEarnings || '0.00';
+          const ebayCharges = order.ebayCharges || '0.00';
+          let total = order.orderTotal;
+          if (total == null || total === '' || isNaN(Number(total))) {
+            total = '0.00';
+          } else {
+            total = Number(total).toFixed(2);
+          }
+          const currency = order.lineItems?.[0]?.total?.currency || order.pricingSummary?.total?.currency || 'USD';
           const fulfillmentStatus = order.orderFulfillmentStatus || 'UNKNOWN';
           const paymentStatus = order.orderPaymentStatus || 'UNKNOWN';
 
@@ -4043,22 +4066,16 @@
           return `
             <tr style="border-bottom: 1px solid var(--border-color);">
               <td style="padding: 12px;">
-                <div style="font-weight: 500; color: var(--text-primary);">${order.legacyOrderId || order.orderId}</div>
-                <div style="font-size: 11px; color: var(--text-tertiary);">${order.orderId}</div>
+                <a href="#" style="color: #2563eb; text-decoration: underline; cursor: pointer; font-weight: 600;" onclick="showOrderDetails('${orderId}')">${orderId}</a>
               </td>
-              <td style="padding: 12px;">
-                <div style="color: var(--text-primary);">${date}</div>
-              </td>
-              <td style="padding: 12px;">
-                <div style="color: var(--text-primary);">${buyerName}</div>
-                <div style="font-size: 11px; color: var(--text-tertiary);">${order.shippingAddress?.fullName || ''}</div>
-              </td>
-              <td style="padding: 12px;">
-                <div style="color: var(--text-primary);">${itemCount} item${itemCount !== 1 ? 's' : ''}</div>
-              </td>
-              <td style="padding: 12px;">
-                <div style="font-weight: 500; color: var(--text-primary);">${currency} ${total}</div>
-              </td>
+              <td style="padding: 12px;">${orderDate}</td>
+              <td style="padding: 12px;">${buyerId}</td>
+              <td style="padding: 12px;">${buyerName}</td>
+              <td style="padding: 12px;">${sku}</td>
+              <td style="padding: 12px;">${qty}</td>
+              <td style="padding: 12px;">${orderEarnings}</td>
+              <td style="padding: 12px;">${ebayCharges}</td>
+              <td style="padding: 12px;">${currency} ${total}</td>
               <td style="padding: 12px;">
                 <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; ${statusStyle}">
                   ${fulfillmentStatus.replace(/_/g, ' ')}
@@ -4487,4 +4504,68 @@
     }
   </style>
 </body>
+  <script>
+    async function showOrderDetails(orderId) {
+      const modal = document.getElementById('orderDetailsModal');
+      const content = document.getElementById('orderDetailsContent');
+      content.innerHTML = '<div style="padding: 32px; text-align: center;">⏳ Loading order details...</div>';
+      modal.classList.add('active');
+      try {
+        const resp = await fetch(`http://localhost:3001/api/orders/${orderId}/details`);
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.error || 'Failed to load order details');
+        const d = data.details;
+        // Render order summary
+        let html = `<div style="padding: 16px;">
+          <h2 style="margin-bottom: 8px;">Order #${d.orderId}</h2>
+          <div style="margin-bottom: 12px; color: var(--text-secondary);">Status: <b>${d.order.status}</b> | Date: ${new Date(d.order.orderDate).toLocaleString()}</div>
+          <div style="margin-bottom: 12px;">Customer: <b>${d.order.customerName || ''}</b> (${d.order.customerEmail || ''})</div>
+          <div style="margin-bottom: 12px;">Shipping: <b>${d.order.shippingAddress || ''}</b></div>
+          <div style="margin-bottom: 12px;">Total: <b>$${d.order.total}</b></div>
+        </div>`;
+        // Fulfillment
+        if (d.fulfillment) {
+          html += `<div style="padding: 16px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 16px;">
+            <h3 style="margin-top: 0;">Fulfillment</h3>
+            <div>Tracking: <b>${d.fulfillment.trackingNumber || 'N/A'}</b></div>
+            <div>Label: <b>${d.fulfillment.shippingLabel || 'N/A'}</b></div>
+          </div>`;
+        }
+        // Finance
+        if (d.finance) {
+          html += `<div style="padding: 16px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 16px;">
+            <h3 style="margin-top: 0;">Finance</h3>
+            <div>Fees: <b>${d.finance.fees || 'N/A'}</b></div>
+            <div>Earnings: <b>${d.finance.earnings || 'N/A'}</b></div>
+          </div>`;
+        }
+        // Items
+        html += `<div style="padding: 16px;">
+          <h3 style="margin-top: 0;">Items</h3>
+          <div style="display: flex; flex-wrap: wrap; gap: 16px;">`;
+        for (const item of d.items) {
+          html += `<div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; min-width: 220px; max-width: 320px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${item.title || item.sku}</div>
+            <div style="margin-bottom: 4px;">SKU: <b>${item.sku}</b></div>
+            <div style="margin-bottom: 4px;">Qty: <b>${item.quantity}</b></div>
+            <div style="margin-bottom: 4px;">Price: <b>$${item.price}</b></div>
+            <div style="margin-bottom: 8px;">`;
+          if (item.images && item.images.length) {
+            html += item.images.map(img => `<img src="${img}" style="max-width: 80px; max-height: 80px; margin: 2px; border-radius: 4px; border: 1px solid #eee;">`).join('');
+          } else {
+            html += '<span style="color: var(--text-tertiary);">No images</span>';
+          }
+          html += '</div></div>';
+        }
+        html += '</div></div>';
+        content.innerHTML = html;
+      } catch (err) {
+        content.innerHTML = `<div style="padding: 32px; text-align: center; color: var(--color-danger);">❌ Failed to load order details<br>${err.message}</div>`;
+      }
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('active');
+    }
+  </script>
 </html>
