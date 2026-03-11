@@ -6,7 +6,67 @@
 const prisma = require('../../core/database');
 const logger = require('../../core/logger')('orders.service');
 
+const fs = require('fs');
+const path = require('path');
+const DATA_STORE_PATH = path.join(__dirname, '../../data/data.json');
+
 class OrdersService {
+    /**
+     * Get full order details (fulfillment, finance, item images)
+     */
+    async getOrderDetails(orderId) {
+      try {
+        // Fetch order with items and shipment using channelOrderId (string)
+        const order = await prisma.order.findFirst({
+          where: { channelOrderId: orderId },
+          include: {
+            items: { include: { product: true } },
+            shipment: true
+          }
+        });
+        if (!order) throw new Error('Order not found');
+
+        // Load local product data for image mapping
+        let productData = {};
+        try {
+          const raw = fs.readFileSync(DATA_STORE_PATH, 'utf8');
+          productData = JSON.parse(raw);
+        } catch (e) {
+          productData = {};
+        }
+
+        // Map item SKUs to images
+        const itemsWithImages = (order.items || []).map(item => {
+          let images = [];
+          // Try SKU, then customLabel
+          for (const entry of Object.values(productData)) {
+            if (entry && (entry.sku === item.sku || entry.customLabel === item.sku)) {
+              images = entry.images || entry.imageSourceUrls || [];
+              break;
+            }
+          }
+          return {
+            ...item,
+            images
+          };
+        });
+
+        // Placeholder: fetch fulfillment and finance details (extend as needed)
+        const fulfillment = order.shipment || null;
+        const finance = order.finance || null;
+
+        return {
+          orderId: order.id,
+          order,
+          fulfillment,
+          finance,
+          items: itemsWithImages
+        };
+      } catch (error) {
+        logger.error('Failed to get order details', { orderId, error: error.message });
+        throw error;
+      }
+    }
   /**
    * List orders
    */

@@ -13,7 +13,6 @@ class OrdersController {
         status: req.query.status,
         limit: req.query.limit
       };
-
       const orders = await ordersService.listOrders(filters);
       res.json({ success: true, count: orders.length, orders });
     } catch (error) {
@@ -28,6 +27,17 @@ class OrdersController {
       res.json({ success: true, order });
     } catch (error) {
       logger.error('Get order failed', { error: error.message });
+      res.status(404).json({ success: false, error: error.message });
+    }
+  }
+
+  async getDetails(req, res) {
+    try {
+      const orderId = req.params.id;
+      const details = await ordersService.getOrderDetails(orderId);
+      res.json({ success: true, details });
+    } catch (error) {
+      logger.error('Get order details failed', { error: error.message });
       res.status(404).json({ success: false, error: error.message });
     }
   }

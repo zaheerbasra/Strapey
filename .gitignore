@@ -18,3 +18,12 @@ examples.js
 # Editor settings
 .vscode/
 /src/generated/prisma
+recover-binary.js
+recover-data.js
+repair-backup.js
+cleanup-images.js
+tmp_broken_skus_round2.txt
+tmp_import_data.tsv
+tmp_missing_image_skus.txt
+tmp_user_skus.txt
+scripts/

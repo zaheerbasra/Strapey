@@ -13,6 +13,12 @@ const CACHE_FILE_PRODUCTION = path.join(__dirname, '../data/ebay-orders-producti
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
 
 class EbayOrdersService {
+    /**
+     * Inject finance service for granular fee extraction
+     */
+    setFinanceService(financeService) {
+      this.financeService = financeService;
+    }
   constructor(getEbayRuntimeConfig, getEbayAccessToken) {
     this.getEbayRuntimeConfig = getEbayRuntimeConfig;
     this.getEbayAccessToken = getEbayAccessToken;
@@ -174,7 +180,24 @@ class EbayOrdersService {
       console.log(`[EbayOrdersService] Fetched ${orders.length} orders (total: ${total})`);
 
       // Transform orders to a consistent format
-      const transformedOrders = orders.map(order => this.transformOrder(order, environment));
+      let transformedOrders = orders.map(order => this.transformOrder(order, environment));
+
+      // If financeService is injected, enrich each order with granular fees
+      if (this.financeService) {
+        // Fetch granular fees for each order
+        const feePromises = orders.map(order => {
+          if (order.orderId) {
+            return this.financeService.fetchOrderFees(order.orderId, environment).catch(() => []);
+          }
+          return Promise.resolve([]);
+        });
+        const allFees = await Promise.all(feePromises);
+        // Map granular fees to transformed orders
+        transformedOrders = transformedOrders.map((order, idx) => ({
+          ...order,
+          granularFees: allFees[idx] || []
+        }));
+      }
 
       // Update cache
       const result = {
@@ -250,6 +273,36 @@ class EbayOrdersService {
     const fulfillmentStartInstructions = ebayOrder.fulfillmentStartInstructions || [{}];
     const shippingAddress = fulfillmentStartInstructions[0]?.shippingStep?.shipTo || {};
 
+    // Extract payment details
+    const pricing = ebayOrder.pricingSummary || {};
+    const paymentSummary = ebayOrder.paymentSummary || {};
+    const marketplaceFee = ebayOrder.totalMarketplaceFee?.value || null;
+    const shippingLabel = ebayOrder.shippingLabelCost?.value || null;
+    // Sales tax
+    let salesTax = null;
+    if (lineItems[0]?.ebayCollectAndRemitTaxes && Array.isArray(lineItems[0].ebayCollectAndRemitTaxes)) {
+      const taxObj = lineItems[0].ebayCollectAndRemitTaxes.find(t => t.taxType === 'STATE_SALES_TAX');
+      salesTax = taxObj ? Number(taxObj.amount?.value || 0) : null;
+    }
+    // Order earnings: what seller actually gets
+    let orderEarnings = null;
+    if (paymentSummary.totalDueSeller) {
+      orderEarnings = Number(paymentSummary.totalDueSeller.value);
+    }
+    // eBay charges: transaction fees + shipping label
+    let ebayCharges = 0;
+    if (marketplaceFee) ebayCharges += Number(marketplaceFee);
+    if (shippingLabel) ebayCharges += Number(shippingLabel);
+    // Sale price
+    const salePrice = lineItems[0]?.total?.value || pricing.total?.value || null;
+    // Buyer name
+    const buyerName = shippingAddress.fullName || buyer.username || '';
+    // Order total
+    const orderTotal = pricing.total?.value || null;
+
+    // Finance API integration for granular fees
+    // Actual granularFees are injected in fetchOrders
+
     return {
       orderId: ebayOrder.orderId,
       legacyOrderId: ebayOrder.legacyOrderId,
@@ -257,13 +310,12 @@ class EbayOrdersService {
       orderPaymentStatus: ebayOrder.orderPaymentStatus,
       creationDate: ebayOrder.creationDate,
       lastModifiedDate: ebayOrder.lastModifiedDate,
-      
       // Buyer information
       buyer: {
         username: buyer.username,
-        buyerRegistrationDate: buyer.buyerRegistrationDate
+        buyerRegistrationDate: buyer.buyerRegistrationDate,
+        name: buyerName
       },
-
       // Shipping address
       shippingAddress: {
         fullName: shippingAddress.fullName,
@@ -271,7 +323,6 @@ class EbayOrdersService {
         primaryPhone: shippingAddress.primaryPhone,
         email: shippingAddress.email
       },
-
       // Line items (products)
       lineItems: lineItems.map(item => ({
         lineItemId: item.lineItemId,
@@ -283,15 +334,20 @@ class EbayOrdersService {
         deliveryCost: item.deliveryCost,
         lineItemFulfillmentStatus: item.lineItemFulfillmentStatus
       })),
-
       // Pricing
-      pricingSummary: ebayOrder.pricingSummary,
-      
+      pricingSummary: pricing,
+      // New fields for UI
+      orderEarnings,
+      ebayCharges: ebayCharges.toFixed(2),
+      salesTax,
+      salePrice,
+      orderTotal,
       // Metadata
       source: 'ebay',
       environment,
       salesRecordReference: ebayOrder.salesRecordReference,
-      
+      // Granular fees (populated in fetchOrders)
+      granularFees: [],
       // Raw data for reference
       _raw: ebayOrder
     };
