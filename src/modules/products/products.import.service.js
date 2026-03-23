@@ -196,6 +196,17 @@ class ProductsImportService {
 
     logger.info(`Starting import of ${productData.length} products with updateExisting=${updateExisting}, keepScrapedData=${keepScrapedData}`);
 
+    // Helper to map images from disk if missing
+    function getImagesForSku(sku) {
+      if (!sku) return [];
+      const imagesDir = path.join(__dirname, '../../../data/images', sku);
+      if (!fs.existsSync(imagesDir)) return [];
+      const files = fs.readdirSync(imagesDir).filter(f =>
+        /\.(jpe?g|png|webp|gif|bmp)$/i.test(f)
+      );
+      return files.map(f => `/images/${sku}/${f}`);
+    }
+
     for (const product of productData) {
       try {
         // Find existing product by link, itemNumber, or SKU
@@ -203,7 +214,6 @@ class ProductsImportService {
         
         if (found && updateExisting) {
           const { key: productKey, product: existingProduct } = found;
-          
           // Check if product has actually changed
           if (!this.hasProductChanged(existingProduct, product)) {
             logger.debug('Product unchanged, skipping update', { sku: product.sku, itemNumber: product.itemNumber });
@@ -214,8 +224,11 @@ class ProductsImportService {
             });
             continue;
           }
-          
           // Update existing product - merge new data while preserving scraped content
+          let mergedImages = existingProduct.images || [];
+          if ((!mergedImages || mergedImages.length === 0) && product.sku) {
+            mergedImages = getImagesForSku(product.sku);
+          }
           const updatedProduct = {
             ...existingProduct,
             // Update with new import data (only if provided)
@@ -226,19 +239,16 @@ class ProductsImportService {
             availableQuantity: product.availableQuantity !== undefined ? product.availableQuantity : existingProduct.availableQuantity,
             inventoryQuantity: product.availableQuantity !== undefined ? product.availableQuantity : (existingProduct.inventoryQuantity ?? existingProduct.availableQuantity),
             currency: product.currency || existingProduct.currency,
-            
             // eBay category is CRITICAL - always update if provided
             ebayCategory: product.ebayCategory || existingProduct.ebayCategory,
             ebayCategoryId: product.ebayCategoryId || existingProduct.ebayCategoryId,
             productGroup: product.productGroup || existingProduct.productGroup || detectProductGroup({ ...existingProduct, ...product }),
             productGroupLabel: getProductGroupLabel(product.productGroup || existingProduct.productGroup || detectProductGroup({ ...existingProduct, ...product })),
-            
             // CRITICAL: Keep all scraped data (description, images, specifics)
             description: existingProduct.description || '',
-            images: existingProduct.images || [],
+            images: mergedImages,
             imagesOriginal: existingProduct.imagesOriginal || [],
             itemSpecifics: existingProduct.itemSpecifics || {},
-            
             // Preserve additional scraped metadata
             condition: existingProduct.condition,
             conditionDisplay: existingProduct.conditionDisplay,
@@ -246,27 +256,22 @@ class ProductsImportService {
             variationDetails: existingProduct.variationDetails,
             imageSourceUrls: existingProduct.imageSourceUrls,
             imageValidationLog: existingProduct.imageValidationLog,
-            
             // Update the URL/link if provided in import
             url: product.link || existingProduct.url || existingProduct.link,
             link: product.link || existingProduct.link || existingProduct.url,
-            
             // Metadata
             importedAt: new Date().toISOString(),
             lastUpdated: new Date().toISOString(),
             source: 'bulk-import-update'
           };
-
           // Use the correct key (prefer URL over sku-based key)
           const finalKey = product.link || productKey;
           allData[finalKey] = updatedProduct;
-          
           // If key changed (e.g., link was added), remove old key
           if (finalKey !== productKey) {
             logger.info('Product key changed, removing old key', { oldKey: productKey, newKey: finalKey });
             delete allData[productKey];
           }
-          
           results.updated.push({
             sku: product.sku,
             itemNumber: product.itemNumber,
@@ -274,12 +279,14 @@ class ProductsImportService {
             categoryId: product.ebayCategoryId,
             productGroup: updatedProduct.productGroup
           });
-          
           logger.info('Product updated', { sku: product.sku, itemNumber: product.itemNumber });
-          
         } else if (!found) {
           // Create new product
           const productKey = product.link || `sku:${product.sku}`;
+          let newImages = [];
+          if (product.sku) {
+            newImages = getImagesForSku(product.sku);
+          }
           const newProduct = {
             itemNumber: product.itemNumber,
             sku: product.sku,
@@ -293,7 +300,7 @@ class ProductsImportService {
             ebayCategoryId: product.ebayCategoryId,
             productGroup: product.productGroup || detectProductGroup(product),
             productGroupLabel: getProductGroupLabel(product.productGroup || detectProductGroup(product)),
-            images: [],
+            images: newImages,
             itemSpecifics: {},
             url: product.link || '',
             link: product.link || '',
@@ -301,7 +308,6 @@ class ProductsImportService {
             lastUpdated: new Date().toISOString(),
             source: 'bulk-import-new'
           };
-
           allData[productKey] = newProduct;
           results.created.push({
             sku: product.sku,
@@ -310,7 +316,6 @@ class ProductsImportService {
             categoryId: product.ebayCategoryId,
             productGroup: newProduct.productGroup
           });
-          
           logger.info('New product created', { sku: product.sku, itemNumber: product.itemNumber, key: productKey });
         } else {
           // Product exists but updateExisting is false

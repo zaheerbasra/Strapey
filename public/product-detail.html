@@ -597,7 +597,7 @@
                     ${product.description ? `
                         <div class="description-section">
                             <h3>Description</h3>
-                            <div class="description">${escapeHtml(product.description)}</div>
+                            <div class="description" id="product-description"></div>
                             ${product.url ? `
                                 <a href="${escapeHtml(product.url)}" target="_blank" rel="noopener" class="original-link">View Original Listing</a>
                             ` : ''}
@@ -619,8 +619,13 @@
                     </div>
                 `;
 
-                document.getElementById('content-area').innerHTML = contentHtml;
-                window.productImages = imageUrls;
+                                document.getElementById('content-area').innerHTML = contentHtml;
+                                window.productImages = imageUrls;
+                                // Render description as HTML
+                                if (product.description) {
+                                    const descEl = document.getElementById('product-description');
+                                    if (descEl) descEl.innerHTML = product.description;
+                                }
             } catch (error) {
                 console.error('Error loading product:', error);
                 document.getElementById('content-area').innerHTML = `

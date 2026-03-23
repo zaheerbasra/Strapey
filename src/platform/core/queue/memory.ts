@@ -1,3 +1,15 @@
+export type Job = {
+  id: string;
+  name: string;
+  data: unknown;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  attempts: number;
+  maxAttempts: number;
+  result?: unknown;
+  error?: string;
+  createdAt: Date;
+  processedAt?: Date;
+};
 /**
  * In-memory job queue implementation
  * Replaces BullMQ for development/testing without Redis dependency
