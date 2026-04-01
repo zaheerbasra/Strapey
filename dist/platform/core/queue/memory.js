@@ -1,8 +1,4 @@
 "use strict";
-/**
- * In-memory job queue implementation
- * Replaces BullMQ for development/testing without Redis dependency
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.queues = void 0;
 exports.enqueue = enqueue;
