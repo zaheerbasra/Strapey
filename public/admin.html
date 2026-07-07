@@ -774,7 +774,7 @@
         </div>
 
         <div class="alert alert-success">
-          ✓ Backend API is active and running on port 4000
+          ✓ Backend API is active and running on port 3001
         </div>
 
         <div class="stats-grid">
@@ -815,7 +815,7 @@
                 <tr>
                   <td>API Server</td>
                   <td><span class="badge badge-success">Online</span></td>
-                  <td>Running on port 4000</td>
+                  <td>Running on port 3001</td>
                 </tr>
                 <tr>
                   <td>Database</td>
@@ -874,26 +874,16 @@
             🔄 Scrape Latest Data
           </button>
           
-          <button class="btn" onclick="startBulkUploadToEbay()" 
+          <button class="btn" onclick="startBulkUploadToEbay()"
             style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-weight: 600; white-space: nowrap; padding: 10px 20px; border: none; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
             🚀 Upload All to eBay
           </button>
-          
-          <!-- Inventory Default Setter -->
-          <div style="display: flex; gap: 8px; align-items: center; background: white; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
-            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 0;">Inventory Default:</label>
-            <input 
-              type="number" 
-              id="inventoryDefaultInput" 
-              min="0" 
-              value="3" 
-              style="width: 70px; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; text-align: center;"
-            />
-            <button class="btn btn-secondary" onclick="setInventoryDefault(event)" style="padding: 8px 14px; white-space: nowrap;">
-              📦 Apply to Zero Stock
-            </button>
-          </div>
-          
+
+          <button class="btn" onclick="startEbaySyncFromEbay()"
+            style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; font-weight: 600; white-space: nowrap; padding: 10px 20px; border: none; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);">
+            🔁 Sync Status from eBay
+          </button>
+
           <!-- SEO Cleanup Button -->
           <button class="btn btn-secondary" onclick="cleanupAllTitles()" style="white-space: nowrap;">
             ✨ SEO Cleanup All
@@ -942,6 +932,14 @@
                 <div id="bulkOpUnchangedCard" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: none;">
                   <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Unchanged</div>
                   <div id="bulkOpUnchanged" style="font-size: 20px; font-weight: 700; color: #6b7280;">0</div>
+                </div>
+                <div id="bulkOpPublishedCard" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: none;">
+                  <div style="font-size: 11px; font-weight: 600; color: #8b5cf6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Newly Published</div>
+                  <div id="bulkOpNewlyPublished" style="font-size: 20px; font-weight: 700; color: #8b5cf6;">0</div>
+                </div>
+                <div id="bulkOpUnmatchedCard" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; display: none;">
+                  <div style="font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">eBay-Only (Unmatched)</div>
+                  <div id="bulkOpUnmatched" style="font-size: 20px; font-weight: 700; color: #6b7280;">0</div>
                 </div>
               </div>
               
@@ -1136,9 +1134,10 @@
             <div>
               <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Limit</label>
               <select id="order-limit-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+                <option value="10" selected>10</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
-                <option value="200" selected>200</option>
+                <option value="500">500</option>
               </select>
             </div>
           </div>
@@ -1568,15 +1567,43 @@
       <div class="modal-header">Edit Product</div>
       <form id="editProductForm" onsubmit="updateProduct(event)">
         <input type="hidden" id="editProductId">
+        <!-- SKU -->
+        <div class="form-group">
+          <label>SKU</label>
+          <input type="text" id="editProductSku" placeholder="e.g., 19-35GD" required />
+          <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+            Changing the SKU renames the product's image folder/files and updates all image URLs. If this product is already published to eBay, the eBay listing's SKU is not updated automatically.
+          </small>
+        </div>
         <!-- Title -->
         <div class="form-group">
           <label>Title</label>
           <input type="text" id="editProductTitle" placeholder="Product Title" required />
         </div>
+        <!-- Description -->
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="editProductDescription" rows="4" placeholder="Product description"></textarea>
+        </div>
         <!-- Price -->
         <div class="form-group">
           <label>Price</label>
           <input type="number" id="editProductPrice" step="0.01" min="0" placeholder="e.g., 19.99" required />
+        </div>
+        <!-- Inventory -->
+        <div class="form-group">
+          <label>On Hand Inventory</label>
+          <input type="number" id="editProductInventory" min="0" placeholder="e.g., 10" />
+        </div>
+        <!-- eBay Category -->
+        <div class="form-group">
+          <label>eBay Category</label>
+          <select id="editProductEbayCategory">
+            <option value="">— Not set —</option>
+          </select>
+          <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+            Options are built from the eBay Cat ID / eBay Category values already used across your products.
+          </small>
         </div>
         <!-- Weight Section -->
         <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; margin-bottom: 20px;">
@@ -2151,7 +2178,7 @@
     }
 
     function syncInventory() {
-      showToast('Syncing inventory across all channels...', 'info');
+      startEbaySyncFromEbay();
     }
 
     function connectChannel(channel) {
@@ -2495,6 +2522,46 @@
     }
 
     // Open Edit Product Modal
+    // Build "id|||name" option value pairs from every distinct eBay category used
+    // across currently loaded products, so the edit modal's dropdown only ever offers
+    // combinations that are already known-good rather than free-typed values.
+    function buildEbayCategoryOptions(selectedCategoryId, selectedCategory) {
+      const select = document.getElementById('editProductEbayCategory');
+      const seen = new Map();
+      for (const p of allProducts) {
+        const id = String(p.ebayCategoryId || '').trim();
+        const name = String(p.ebayCategory || '').trim();
+        if (!id && !name) continue;
+        const key = `${id}|||${name}`;
+        if (!seen.has(key)) seen.set(key, { id, name });
+      }
+      const sorted = Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+
+      select.innerHTML = '<option value="">— Not set —</option>';
+      const selectedKey = `${String(selectedCategoryId || '').trim()}|||${String(selectedCategory || '').trim()}`;
+      let matchedExisting = false;
+      for (const { id, name } of sorted) {
+        const key = `${id}|||${name}`;
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = id ? `${id} — ${name || '(no name)'}` : (name || '(unnamed)');
+        if (key === selectedKey) {
+          option.selected = true;
+          matchedExisting = true;
+        }
+        select.appendChild(option);
+      }
+      // If the product's current category isn't in the known set (e.g. legacy/unique
+      // value), add it as its own option so we don't silently discard it on save.
+      if (!matchedExisting && (selectedCategoryId || selectedCategory)) {
+        const option = document.createElement('option');
+        option.value = selectedKey;
+        option.textContent = selectedCategoryId ? `${selectedCategoryId} — ${selectedCategory || '(no name)'}` : (selectedCategory || '(unnamed)');
+        option.selected = true;
+        select.appendChild(option);
+      }
+    }
+
     async function openEditProductModal(productId) {
       try {
         const response = await fetch(`http://localhost:3001/api/products/${productId}`);
@@ -2503,8 +2570,12 @@
         const product = data.product || data;
         // Set form values
         document.getElementById('editProductId').value = productId;
+        document.getElementById('editProductSku').value = product.sku || product.customLabel || '';
         document.getElementById('editProductTitle').value = product.title || '';
+        document.getElementById('editProductDescription').value = product.description || '';
         document.getElementById('editProductPrice').value = product.price || '';
+        document.getElementById('editProductInventory').value = product.inventoryQuantity || product.availableQuantity || product.inventory || '';
+        buildEbayCategoryOptions(product.ebayCategoryId, product.ebayCategory);
         // Weight
         let weightValue = '';
         let weightUnit = 'oz';
@@ -2550,16 +2621,25 @@
       event.preventDefault();
       try {
         const productId = document.getElementById('editProductId').value;
+        const sku = document.getElementById('editProductSku').value.trim();
         const title = document.getElementById('editProductTitle').value.trim();
+        const description = document.getElementById('editProductDescription').value;
         const price = parseFloat(document.getElementById('editProductPrice').value) || null;
+        const inventory = parseInt(document.getElementById('editProductInventory').value) || 0;
         const weightValue = parseFloat(document.getElementById('editWeightValue').value) || null;
         const weightUnit = document.getElementById('editWeightUnit').value;
         const length = parseFloat(document.getElementById('editDimensionsLength').value) || 0;
         const width = parseFloat(document.getElementById('editDimensionsWidth').value) || 0;
         const height = parseFloat(document.getElementById('editDimensionsHeight').value) || 0;
+        const [ebayCategoryId, ebayCategory] = document.getElementById('editProductEbayCategory').value.split('|||');
         const updateData = {
+          sku,
           title,
+          description,
           price,
+          inventory,
+          ebayCategoryId: ebayCategoryId || '',
+          ebayCategory: ebayCategory || '',
           weight: weightValue,
           weightUnit: weightValue ? weightUnit : null,
           dimensions: {
@@ -2574,7 +2654,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updateData)
         });
-        if (!response.ok) throw new Error('Failed to update product');
+        if (!response.ok) {
+          let message = 'Failed to update product';
+          try {
+            const errData = await response.json();
+            if (errData && errData.error) message = errData.error;
+          } catch (_) {}
+          throw new Error(message);
+        }
         closeModal('editProductModal');
         showToast('Product updated successfully', 'success');
         loadProducts();
@@ -2748,7 +2835,7 @@
       
       try {
         console.log('Step 1: Sending listing creation request...');
-        const response = await fetch('http://localhost:4000/api/platform/integrations/ebay/listings/sandbox', {
+        const response = await fetch('http://localhost:4001/api/platform/integrations/ebay/listings/sandbox', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json'
@@ -2796,66 +2883,9 @@
       } catch (error) {
         console.error('=== Publish Error ===');
         console.error('Error publishing to eBay:', error);
-        showToast('Failed to publish to eBay Sandbox: ' + error.message + '<br><br>Make sure both servers are running:<br>• Express on port 3001<br>• Platform on port 4000', 'error', 10000);
+        showToast('Failed to publish to eBay Sandbox: ' + error.message + '<br><br>Make sure both servers are running:<br>• Express on port 3001<br>• Platform on port 4001', 'error', 10000);
         btn.disabled = false;
         btn.textContent = '📤';
-      }
-    }
-
-    // Set Inventory Default (Only for Zero Stock Items)
-    async function setInventoryDefault(event) {
-      const input = document.getElementById('inventoryDefaultInput');
-      const inventoryValue = parseInt(input.value);
-      
-      if (isNaN(inventoryValue) || inventoryValue < 0) {
-        showToast('Please enter a valid non-negative number', 'warning');
-        return;
-      }
-      
-      if (!await showConfirm(`Set inventory to ${inventoryValue} for all products with ZERO stock?\n\n(Products with existing inventory will not be changed)`, 'Apply Inventory to Zero Stock')) {
-        return;
-      }
-      
-      try {
-        // Show loading state
-        const btn = event.target;
-        const originalText = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Updating...';
-        
-        const response = await fetch('http://localhost:3001/api/products/bulk/set-inventory', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            inventory: inventoryValue,
-            onlyZero: true 
-          })
-        });
-        
-        if (!response.ok) throw new Error('Failed to update inventory');
-        
-        const result = await response.json();
-        
-        // Show detailed results
-        let message = `✓ Inventory Update Complete!<br><br>`;
-        message += `• Updated: ${result.updated} products (set to ${inventoryValue})<br>`;
-        message += `• Skipped: ${result.skipped} products (already had stock)<br>`;
-        message += `• Mode: Only zero-stock products`;
-        
-        showToast(message, 'success', 7000);
-        loadProducts();
-        
-        // Restore button
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-      } catch (error) {
-        console.error('Error updating inventory:', error);
-        showToast('Failed to update inventory: ' + error.message, 'error');
-        
-        // Restore button
-        const btn = event.target;
-        btn.disabled = false;
-        btn.innerHTML = '📦 Apply to Zero Stock';
       }
     }
 
@@ -2904,9 +2934,19 @@
               clearInterval(checkInterval);
               showStatus(statusId, 'success', '✓ Product re-scraped successfully!');
               setTimeout(() => loadProducts(), 1000);
+            } else if (jobData.job.status === 'partial') {
+              // Some items in the job failed (e.g. an earlier retry hit a transient
+              // block) but this one may have succeeded - refresh the list either way
+              // instead of leaving stale data showing with no explanation.
+              clearInterval(checkInterval);
+              const itemFailed = jobData.job.items && jobData.job.items[0] && jobData.job.items[0].status === 'failed';
+              showStatus(statusId, itemFailed ? 'error' : 'success',
+                itemFailed ? '✗ Re-scrape failed after retries: ' + (jobData.job.items[0].error || 'Unknown error') : '✓ Product re-scraped successfully!');
+              setTimeout(() => loadProducts(), 1000);
             } else if (jobData.job.status === 'failed') {
               clearInterval(checkInterval);
               showStatus(statusId, 'error', '✗ Re-scrape failed: ' + (jobData.job.error || 'Unknown error'));
+              setTimeout(() => loadProducts(), 1000);
             } else if (attempts > 30) {
               clearInterval(checkInterval);
               showStatus(statusId, 'warning', '⏱ Re-scrape taking longer than expected...');
@@ -3182,14 +3222,92 @@
       }
     }
 
+    // Sync Status from eBay: pull the seller's real offer state, mark already-live
+    // products as Published locally, and push any local price/qty/content edits to eBay.
+    async function startEbaySyncFromEbay() {
+      try {
+        const dryRunResponse = await fetch('/api/products/sync-from-ebay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dryRun: true, environment: 'production' })
+        });
+
+        if (!dryRunResponse.ok) throw new Error('Failed to preview sync');
+        const plan = await dryRunResponse.json();
+        if (!plan.success) throw new Error(plan.error || 'Failed to preview sync');
+
+        const totalChanges = (plan.toMarkPublished?.length || 0) + (plan.toPushUpdate?.length || 0);
+        if (totalChanges === 0) {
+          showToast(
+            `✓ Already in sync. Matched ${plan.totalMatched} product(s) with eBay, no changes needed.` +
+            (plan.unmatchedOnEbayCount ? `<br>${plan.unmatchedOnEbayCount} eBay listing(s) have no matching local SKU.` : ''),
+            'success', 6000
+          );
+          return;
+        }
+
+        const confirmMessage = '🔁 Sync Status from eBay<br><br>' +
+          `Matched <strong>${plan.totalMatched}</strong> local SKU(s) against ${plan.totalEbayOffers} eBay offer(s):<br><br>` +
+          `• <strong>${plan.toMarkPublished.length}</strong> will be marked Published (already live on eBay, not tracked locally)<br>` +
+          `• <strong>${plan.toPushUpdate.length}</strong> will be pushed to eBay (local price/quantity/content changed since last publish)<br>` +
+          (plan.unmatchedOnEbayCount ? `• ${plan.unmatchedOnEbayCount} eBay listing(s) have no matching local SKU (left untouched)<br>` : '') +
+          '<br>⚠️ <strong>This will write to your LIVE eBay account.</strong><br><br>Continue?';
+
+        if (!await showConfirm(confirmMessage, 'Sync Status from eBay')) return;
+
+        document.getElementById('bulkOperationProgress').style.display = 'block';
+        document.getElementById('bulkOpTitle').textContent = '🔁 Sync Status from eBay';
+        document.getElementById('bulkOpSubtitle').textContent = 'Reconciling with eBay...';
+        document.getElementById('bulkOpChangesCard').style.display = 'none';
+        document.getElementById('bulkOpUnchangedCard').style.display = 'inline-block';
+        document.getElementById('bulkOpPublishedCard').style.display = 'inline-block';
+        document.getElementById('bulkOpUnmatchedCard').style.display = 'inline-block';
+
+        const response = await fetch('/api/products/sync-from-ebay', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dryRun: false, environment: 'production' })
+        });
+
+        if (!response.ok) throw new Error('Failed to start sync');
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Failed to start sync');
+
+        document.getElementById('bulkOpNewlyPublished').textContent = result.newlyPublishedCount || 0;
+        document.getElementById('bulkOpUnchanged').textContent = result.unchangedCount || 0;
+        document.getElementById('bulkOpUnmatched').textContent = result.unmatchedOnEbayCount || 0;
+
+        if (!result.jobId) {
+          // No drifted products needed pushing - status reconciliation already applied.
+          showToast(result.message || 'Sync complete.', 'success', 6000);
+          document.getElementById('bulkOperationProgress').style.display = 'none';
+          loadProducts();
+          return;
+        }
+
+        bulkOperationJobId = result.jobId;
+        document.getElementById('bulkOpSubtitle').textContent =
+          `Pushing ${result.toUpdateCount} update(s) to eBay...`;
+
+        startBulkOperationPolling('sync');
+
+      } catch (error) {
+        console.error('Error starting eBay sync:', error);
+        showToast('Failed to sync with eBay: ' + error.message, 'error');
+        document.getElementById('bulkOperationProgress').style.display = 'none';
+      }
+    }
+
     // Start polling for job status
     function startBulkOperationPolling(operationType) {
       if (bulkOperationPollInterval) {
         clearInterval(bulkOperationPollInterval);
       }
-      
-      const endpoint = operationType === 'scrape' 
-        ? '/api/products/scrape-all/' 
+
+      const endpoint = operationType === 'scrape'
+        ? '/api/products/scrape-all/'
+        : operationType === 'sync'
+        ? '/api/products/sync-from-ebay/'
         : '/api/products/publish-all-to-ebay/';
       
       bulkOperationPollInterval = setInterval(async () => {
@@ -3208,12 +3326,14 @@
               // Show completion notification
               if (result.job.status === 'completed') {
                 setTimeout(() => {
-                  const message = `✓ ${operationType === 'scrape' ? 'Scrape' : 'Upload'} Complete!<br><br>` +
+                  const opLabel = operationType === 'scrape' ? 'Scrape' : operationType === 'sync' ? 'eBay Sync' : 'Upload';
+                  const message = `✓ ${opLabel} Complete!<br><br>` +
                     `Processed: ${result.job.processedCount}<br>` +
                     `Success: ${result.job.successCount}<br>` +
                     `Failures: ${result.job.failureCount}` +
-                    (operationType === 'scrape' ? `<br>Updated: ${result.job.updatedCount}<br>Unchanged: ${result.job.unchangedCount}` : '');
-                  
+                    (operationType === 'scrape' ? `<br>Updated: ${result.job.updatedCount}<br>Unchanged: ${result.job.unchangedCount}` : '') +
+                    (operationType === 'sync' ? `<br>Newly Published: ${result.job.newlyPublishedCount}<br>Unchanged: ${result.job.unchangedCount}` : '');
+
                   showToast(message, 'success', 8000);
                   
                   // Reload products
@@ -3250,7 +3370,14 @@
         document.getElementById('bulkOpUpdated').textContent = job.updatedCount || 0;
         document.getElementById('bulkOpUnchanged').textContent = job.unchangedCount || 0;
       }
-      
+
+      // Sync-specific stats
+      if (operationType === 'sync') {
+        document.getElementById('bulkOpUnchanged').textContent = job.unchangedCount || 0;
+        document.getElementById('bulkOpNewlyPublished').textContent = job.newlyPublishedCount || 0;
+        document.getElementById('bulkOpUnmatched').textContent = job.unmatchedOnEbayCount || 0;
+      }
+
       // Status
       const statusText = job.status.charAt(0).toUpperCase() + job.status.slice(1);
       document.getElementById('bulkOpStatus').textContent = statusText;
@@ -3280,10 +3407,15 @@
         job.recentResults.slice(-5).forEach(result => {
           if (operationType === 'scrape') {
             const icon = result.hasChanges ? '🔄' : '✓';
-            const text = result.hasChanges 
+            const text = result.hasChanges
               ? `${icon} Updated: ${result.sku} (${result.changeCount} changes)`
               : `${icon} No changes: ${result.sku}`;
             activities.push(`<div style="color: ${result.hasChanges ? '#f59e0b' : '#10b981'}; margin-bottom: 4px;">${text}</div>`);
+          } else if (operationType === 'sync') {
+            const reasons = result.reasons
+              ? Object.entries(result.reasons).filter(([, v]) => v).map(([k]) => k.replace('Changed', '')).join(', ')
+              : '';
+            activities.push(`<div style="color: #10b981; margin-bottom: 4px;">✓ Pushed to eBay: ${result.sku}${reasons ? ' (' + reasons + ')' : ''}</div>`);
           } else {
             activities.push(`<div style="color: #10b981; margin-bottom: 4px;">✓ Published: ${result.sku}${result.listingId ? ' → ' + result.listingId : ''}</div>`);
           }
@@ -3346,18 +3478,15 @@
         if (response.ok) {
           const products = await response.json();
           document.getElementById('stat-products').textContent = products.length;
-          // Count products ready for eBay with active inventory:
-          // - Have valid ID (itemNumber from eBay)
-          // - Have title, price, description
-          // - Have valid category (not "N/A")
-          // - Have images
-          // - Have inventory > 0
-          const activeOnEbay = products.filter(p => 
-            p.id && p.id !== 'unknown' &&
-            p.title && p.price && p.description &&
-            p.ebayCategoryId && p.ebayCategoryId !== 'N/A' &&
-            p.imageSourceUrls && p.imageSourceUrls.length > 0 &&
-            p.inventory > 0
+          // Same Published/Draft signal used by the product table and status filter
+          // (server.js already resolves this into product.publishStatus).
+          const activeOnEbay = products.filter(p =>
+            p.publishStatus === 'Published' ||
+            p.publishedToProduction ||
+            p.productionLink ||
+            p.productionListingId ||
+            p.publishedLink ||
+            p.sandboxListingId
           ).length;
           document.getElementById('stat-inventory').textContent = activeOnEbay;
         }

@@ -1,3 +1,5 @@
+// Export for scripts and direct usage
+module.exports.scrapeEbayProduct = scrapeEbayProduct;
 require('dotenv').config();
 const express = require('express');
 const puppeteer = require('puppeteer');
@@ -98,7 +100,7 @@ function getEbayOrdersService() {
 }
 
 // --- Browser launch logging and fallback ---
-function getBrowserLaunchOptions() {
+function getBrowserLaunchOptions(useProfile = false) {
   const log = (msg, data) => console.log('[Puppeteer]', msg, data !== undefined ? JSON.stringify(data) : '');
 
   log('Resolving browser executable...');
@@ -174,8 +176,20 @@ function getBrowserLaunchOptions() {
     ]
   };
   if (executablePath) opts.executablePath = executablePath;
+  if (useProfile) {
+    // Reuse a persistent Chrome profile so cookies/session build up across scrapes
+    // like a real returning visitor, instead of every scrape looking like a brand
+    // new stranger teleporting straight to one listing with zero history - one of
+    // the signals bot detection weighs alongside request volume/fingerprinting.
+    opts.userDataDir = path.join(__dirname, 'data', '.browser-profile');
+  }
   return opts;
 }
+
+// Chrome refuses to run two instances against the same userDataDir at once, so only
+// one concurrent scrape may use the persistent profile; others fall back to an
+// ephemeral profile (previous behavior) rather than colliding with it.
+let persistentProfileInUse = false;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -199,6 +213,10 @@ app.use('/data', express.static(path.join(__dirname, 'data')));
 // Serve SKU-based product images
 fs.ensureDirSync(path.join('data', 'images'));
 app.use('/images', express.static(path.join(__dirname, 'data', 'images')));
+
+// Persistent Chrome profile for scraping (cookies/session continuity - see
+// getBrowserLaunchOptions). Not served statically: express.static ignores dotfiles.
+fs.ensureDirSync(path.join('data', '.browser-profile'));
 
 const DATA_FILE_PATH = path.join('data', 'data.json');
 const ADMIN_CONFIG_PATH = path.join('data', 'admin-config.json');
@@ -831,6 +849,35 @@ app.put('/api/products/:id', async (req, res) => {
     
     // Update product fields
     const product = allData[productKey];
+
+    // SKU update: rename image folder/files and remap all image URLs
+    if (req.body.sku !== undefined) {
+      const newSku = String(req.body.sku || '').trim();
+      const oldSku = product.sku || product.customLabel || '';
+      if (!newSku) {
+        return res.status(400).json({ error: 'SKU cannot be empty' });
+      }
+      if (newSku !== oldSku) {
+        const skuTaken = Object.entries(allData).some(([key, p]) =>
+          key !== productKey && (p.sku === newSku || p.customLabel === newSku)
+        );
+        if (skuTaken) {
+          return res.status(409).json({ error: `SKU "${newSku}" is already used by another product` });
+        }
+
+        const renameMap = renameProductSkuAssets(oldSku, newSku);
+        const remapImagePaths = (list) => Array.isArray(list)
+          ? list.map((imgPath) => renameMap.get(imgPath) || imgPath)
+          : list;
+
+        product.images = remapImagePaths(product.images);
+        product.imageSourceUrls = remapImagePaths(product.imageSourceUrls);
+        product.imagesOriginal = remapImagePaths(product.imagesOriginal);
+        product.sku = newSku;
+        if (product.customLabel) product.customLabel = newSku;
+      }
+    }
+
     if (req.body.title !== undefined) product.title = sanitizeTitle(String(req.body.title || ''));
     if (req.body.price !== undefined) product.price = req.body.price;
     if (req.body.inventory !== undefined) product.inventoryQuantity = req.body.inventory;
@@ -842,7 +889,17 @@ app.put('/api/products/:id', async (req, res) => {
       }
     }
     if (req.body.productGroup !== undefined) product.productGroup = req.body.productGroup;
-    
+
+    // eBay category (id + name are set together so they never end up mismatched)
+    if (req.body.ebayCategoryId !== undefined || req.body.ebayCategory !== undefined) {
+      const newCategoryId = String(req.body.ebayCategoryId || '').trim();
+      const newCategory = String(req.body.ebayCategory || '').trim();
+      product.ebayCategoryId = newCategoryId;
+      product.ebayCategory = newCategory;
+      product.category = newCategory;
+      product.categoryId = newCategoryId;
+    }
+
     // Weight and dimensions support
     if (req.body.weight !== undefined) product.weight = req.body.weight;
     if (req.body.weightUnit !== undefined) product.weightUnit = req.body.weightUnit;
@@ -883,59 +940,6 @@ app.delete('/api/products/:url', async (req, res) => {
   }
 });
 
-// API: Bulk set inventory
-app.post('/api/products/bulk/set-inventory', async (req, res) => {
-  try {
-    if (!fs.existsSync(DATA_FILE_PATH)) {
-      return res.json({ updated: 0, skipped: 0 });
-    }
-    
-    const { inventory, onlyZero = true } = req.body;
-    
-    // Validate inventory value
-    if (inventory === undefined || inventory === null || inventory < 0) {
-      return res.status(400).json({ 
-        error: 'Invalid inventory value. Must be a non-negative number.' 
-      });
-    }
-    
-    const allData = fs.readJsonSync(DATA_FILE_PATH);
-    let updated = 0;
-    let skipped = 0;
-    
-    Object.keys(allData).forEach(key => {
-      const product = allData[key];
-      const currentInventory = product.inventory || product.inventoryQuantity || product.availableQuantity || 0;
-      
-      // Only update if onlyZero is false, OR if current inventory is 0
-      if (!onlyZero || currentInventory === 0) {
-        // Update all possible inventory field names for consistency
-        allData[key].inventory = inventory;
-        allData[key].inventoryQuantity = inventory;
-        allData[key].availableQuantity = inventory;
-        allData[key].lastUpdated = new Date().toISOString();
-        updated++;
-      } else {
-        skipped++;
-      }
-    });
-    
-    fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
-    
-    console.log(`Bulk Inventory Update: inventory=${inventory}, onlyZero=${onlyZero}, updated=${updated}, skipped=${skipped}`);
-    
-    res.json({ 
-      success: true, 
-      updated, 
-      skipped,
-      inventoryValue: inventory,
-      onlyZero 
-    });
-  } catch (error) {
-    console.error('Error setting inventory:', error);
-    res.status(500).json({ error: 'Failed to set inventory' });
-  }
-});
 
 // API: Bulk cleanup titles and descriptions with SEO optimization
 app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
@@ -954,7 +958,8 @@ app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
       /Shard\s*-?\s*Blade?/gi,
       /-?Blade\s+/gi,  // Remove "-Blade " or "Blade " from start
       /Lorandos/gi,
-      /\bShard\b/gi
+      /\bShard\b/gi,
+      /\bstrapey\s*[®™]?\b/gi
     ];
     
     // Function to clean and optimize text for SEO
@@ -968,14 +973,19 @@ app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
         optimized = optimized.replace(pattern, '');
       });
 
-      // Remove trademark symbols across both title and description
+      // Remove trademark symbols (®, ™) across both title and description
       optimized = stripTrademarkSymbols(optimized);
-      
+
       // Clean up extra spaces and punctuation
       optimized = optimized.replace(/\s+/g, ' ').trim();
       optimized = optimized.replace(/\s*-\s*-\s*/g, ' - '); // Fix double dashes
       optimized = optimized.replace(/^\s*-\s*/, ''); // Remove leading dash
       optimized = optimized.replace(/\s*-\s*$/, ''); // Remove trailing dash
+
+      // Strip any leftover leading punctuation/symbols (e.g. a stray "® " left
+      // behind once the brand name in front of it was removed) so the string
+      // always starts on an actual word character.
+      optimized = optimized.replace(/^[^\p{L}\p{N}]+/u, '').trim();
       
       if (type === 'title') {
         // Title case for better readability and SEO
@@ -1306,9 +1316,10 @@ app.post('/api/products/:id/publish/production', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error publishing to production:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message 
+      error: error.message,
+      ebayErrors: error.response?.data?.errors || error.response?.data || null
     });
   }
 });
@@ -1978,46 +1989,50 @@ function getRuntimeConfig() {
 
 /** SEO-friendly title: clean, concise, ~60–80 chars for snippets, title-style. */
 function makeSeoTitle(raw, itemSpecifics = {}) {
-  if (!raw || typeof raw !== 'string') return 'Strapey Product';
-  
+  if (!raw || typeof raw !== 'string') return 'Product';
+
   let t = raw
     .replace(/\s+/g, ' ')
     .replace(/\s*[|\-–—]\s*$/i, '')
     .trim();
-  
+
   // Remove common eBay clutter
   t = t.replace(/\s*(New Listing|Free shipping|Best offer|\d+\s*available)\s*$/gi, '').trim();
-  
-  // Always use Strapey as brand (itemSpecifics already sanitized by sanitizeProduct)
-  const brand = 'Strapey';
-  
-  // If title doesn't already contain Strapey, prepend it for SEO
-  if (!t.toLowerCase().includes('strapey')) {
-    t = `${brand} ${t}`;
-  }
-  
-  // Optimize length: ideal 50-60 chars for search results, max 70
-  if (t.length > 70) {
+
+  // Brand name must never appear in the title text itself (it's the value of the
+  // Brand item specific/aspect, not title copy) - strip any occurrence, including
+  // a trailing trademark symbol, rather than prepending it as SEO copy.
+  t = t.replace(/\bstrapey\s*[®™]?\s*/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+  // Strip any stray trademark symbol / punctuation left dangling at the start
+  // (e.g. a source brand name was stripped upstream, leaving just "® ").
+  t = t.replace(/[™®]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s{2,}/g, ' ').trim();
+
+  // Optimize length: ideal 80-90 chars for search results, max 90
+  if (t.length > 90) {
     // Try to cut at word boundary
-    let truncated = t.substring(0, 67).trim();
+    let truncated = t.substring(0, 87).trim();
     const lastSpace = truncated.lastIndexOf(' ');
-    if (lastSpace > 50) {
+    if (lastSpace > 80) {
       truncated = truncated.substring(0, lastSpace).trim();
     }
-    t = (truncated.length > 0 ? truncated : t.substring(0, 67).trim()) + '...';
+    t = (truncated.length > 0 ? truncated : t.substring(0, 87).trim()) + '...';
   }
-  
-  return t || 'Strapey Product';
+
+  return t || 'Product';
 }
 
 /** SEO-friendly description: structure, keywords, full content, remove eBay boilerplate */
 const DESCRIPTION_MAX_LENGTH = 20000;
 
 function makeSeoDescription(raw, itemSpecifics = {}, title = '', product = {}) {
-  if (!raw || typeof raw !== 'string') return '';
-  
+  // eBay requires a non-empty description (1-4000 chars) to publish a listing.
+  // Scrapes that get blocked/interstitial-blocked can leave raw description
+  // empty; fall back to the title so we never hand eBay an empty string.
+  const rawText = (raw && typeof raw === 'string') ? raw : '';
+
   // Clean up eBay boilerplate
-  let d = raw
+  let d = rawText
     .replace(/\s*Read more\s*/gi, ' ')
     .replace(/\s*Item specifics[\s\S]*?opens in a new window or tab\s*/gi, ' ')
     .replace(/\s*See all condition definitions\s*/gi, ' ')
@@ -2589,6 +2604,11 @@ async function upsertInventoryItemWithVideoFallback({ apiBase, sku, payload, tok
     const isVideoRelated = hasVideo && /video|media/.test(errText);
 
     if (!isVideoRelated) {
+      logger.error('Inventory item upsert rejected by eBay', {
+        sku,
+        status: error.response?.status,
+        ebayErrors: error.response?.data?.errors || error.response?.data
+      });
       throw error;
     }
 
@@ -3020,6 +3040,75 @@ async function findExistingOffer(sku, token, apiBase) {
   }
 }
 
+/**
+ * Enumerate every SKU registered in the seller's eBay account, paginating
+ * through GET /sell/inventory/v1/inventory_item until all pages are consumed.
+ * There is no bulk "list all offers" endpoint - GET /sell/inventory/v1/offer
+ * requires a `sku` query param - so this is the only way to discover the
+ * full set of SKUs without already knowing them.
+ */
+async function fetchAllEbayInventorySkus(token, apiBase, { logger = null } = {}) {
+  const skus = new Set();
+  const limit = 100;
+  let offset = 0;
+  let total = Infinity;
+
+  while (offset < total) {
+    const response = await axios.get(`${apiBase}/sell/inventory/v1/inventory_item`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      params: { limit, offset },
+      timeout: 30000
+    });
+
+    const data = response.data || {};
+    total = typeof data.total === 'number' ? data.total : (data.inventoryItems || []).length;
+    const items = data.inventoryItems || [];
+
+    items.forEach((item) => {
+      if (item.sku) skus.add(item.sku);
+    });
+
+    if (logger) {
+      logger.debug('Fetched eBay inventory item page', { offset, limit, received: items.length, total });
+    }
+
+    if (items.length === 0) break;
+    offset += limit;
+  }
+
+  return skus;
+}
+
+/**
+ * Look up the live offer for a single SKU via GET /sell/inventory/v1/offer?sku=.
+ * Returns null if eBay has no offer for that SKU.
+ */
+async function fetchOfferForSku(sku, token, apiBase) {
+  const response = await axios.get(`${apiBase}/sell/inventory/v1/offer`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Content-Language': 'en-US'
+    },
+    params: { sku },
+    timeout: 30000
+  });
+
+  const offer = (response.data?.offers || [])[0];
+  if (!offer) return null;
+
+  return {
+    offerId: offer.offerId,
+    listingId: offer.listing?.listingId || null,
+    status: offer.status,
+    price: offer.pricingSummary?.price?.value !== undefined ? Number(offer.pricingSummary.price.value) : null,
+    quantity: typeof offer.availableQuantity === 'number' ? offer.availableQuantity : null
+  };
+}
+
 function isEbayAccessDeniedError(error) {
   if (!error || error.response?.status !== 403) return false;
   const errors = error.response?.data?.errors;
@@ -3089,6 +3178,29 @@ async function publishViaTradingApiFallback(productData, logger, overrides = {})
   };
 }
 
+// eBay requires category-specific item specifics; Pistol Parts (73944) rejects
+// listings missing "For Gun Type" with errorId 25002 even though the rest of the
+// listing (title/price/images) is valid.
+const PISTOL_PARTS_CATEGORY_ID = '73944';
+
+function getDefaultAspectsForCategory(categoryId) {
+  const defaults = {
+    'Brand': 'Strapey',
+    'Size Type': 'Large',
+    'Size': 'One Size',
+    'Color': 'Silver',
+    'Blade Material': 'Steel',
+    'Type': 'Knife',
+    'Department': 'Unisex'
+  };
+
+  if (String(categoryId || '') === PISTOL_PARTS_CATEGORY_ID) {
+    defaults['For Gun Type'] = 'Handgun';
+  }
+
+  return defaults;
+}
+
 async function publishToEbay(productData, overrides = {}) {
   const logger = createLogger('PublishToEbay');
   
@@ -3099,7 +3211,20 @@ async function publishToEbay(productData, overrides = {}) {
     const ebayConfig = getEbayRuntimeConfig(resolvedOverrides);
     const normalizedProductData = forceNewConditionDefaults(productData || {});
     const sku = normalizedProductData.customLabel || normalizedProductData.sku || 'UNKNOWN';
-    
+
+    // eBay's Inventory API rejects an empty description with a 400 (errorId 25718).
+    // Some older/re-imported records were saved with description: '' (e.g. from a
+    // blocked scrape); regenerate one from the title/specifics rather than failing.
+    if (!String(normalizedProductData.description || '').trim()) {
+      logger.warn('Product has empty description; generating fallback before publish', { sku });
+      normalizedProductData.description = makeSeoDescription(
+        normalizedProductData.title || '',
+        normalizedProductData.itemSpecifics || {},
+        normalizedProductData.title || '',
+        normalizedProductData
+      );
+    }
+
     logger.info('========================================');
     logger.info('PUBLISH FLOW STARTED', { 
       sku, 
@@ -3290,16 +3415,8 @@ async function publishToEbay(productData, overrides = {}) {
       );
       
       // Add default values for commonly required fields in collectible categories
-      const defaultAspects = {
-        'Brand': 'Strapey',
-        'Size Type': 'Large',
-        'Size': 'One Size',
-        'Color': 'Silver',
-        'Blade Material': 'Steel',
-        'Type': 'Knife',
-        'Department': 'Unisex'
-      };
-      
+      const defaultAspects = getDefaultAspectsForCategory(categoryId);
+
       Object.entries(defaultAspects).forEach(([key, value]) => {
         if (!aspects[key]) {
           aspects[key] = [value];
@@ -3433,14 +3550,33 @@ async function publishToEbay(productData, overrides = {}) {
         logger.info(`No inventory/offer changes detected. Listing remains as-is.`);
       }
 
+      // The offer exists but was never actually published (e.g. a prior attempt
+      // failed after offer creation but before the publish call succeeded).
+      // Without this, the function returns "success" while no live listing exists.
+      let finalListingId = existingOffer.listingId;
+      if (!finalListingId) {
+        logger.info(`Existing offer has no live listing yet. Publishing offer: ${existingOffer.offerId}`);
+        const publishResponse = await axios.post(`${apiBase}/sell/inventory/v1/offer/${encodeURIComponent(existingOffer.offerId)}/publish`, {}, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US'
+          },
+          timeout: 30000
+        });
+        finalListingId = publishResponse.data?.listingId || null;
+        logger.success(`Listing published successfully`, { listingId: finalListingId });
+      }
+
       // Return existing listing link
-      const listingLink = existingOffer.listingId ? `${listingBase}/itm/${existingOffer.listingId}` : null;
-      
+      const listingLink = finalListingId ? `${listingBase}/itm/${finalListingId}` : null;
+
       logger.success(`Publish operation completed: ${dataChanged ? 'UPDATED' : 'UNCHANGED'}`, { listingLink });
       return {
+        success: true,
         offerId: existingOffer.offerId,
         sku,
-        listingId: existingOffer.listingId,
+        listingId: finalListingId,
         listingLink,
         status: existingOffer.status,
         action: shouldUpdateInventory ? 'UPDATED' : 'UNCHANGED',
@@ -3462,16 +3598,8 @@ async function publishToEbay(productData, overrides = {}) {
     );
     
     // Add default values for commonly required fields in collectible categories
-    const defaultAspects = {
-      'Brand': 'Strapey',
-      'Size Type': 'Large',
-      'Size': 'One Size',
-      'Color': 'Silver',
-      'Blade Material': 'Steel',
-      'Type': 'Knife',
-      'Department': 'Unisex'
-    };
-    
+    const defaultAspects = getDefaultAspectsForCategory(categoryId);
+
     Object.entries(defaultAspects).forEach(([key, value]) => {
       if (!aspects[key]) {
         aspects[key] = [value];
@@ -3687,9 +3815,10 @@ async function publishToEbay(productData, overrides = {}) {
   } catch (error) {
     const errorSku = productData?.customLabel || productData?.sku || 'UNKNOWN';
     logger.error('========================================');
-    logger.error('PUBLISH FLOW FAILED', { 
+    logger.error('PUBLISH FLOW FAILED', {
       sku: errorSku,
       error: error.message,
+      ebayErrors: error.response?.data?.errors || error.response?.data,
       stack: error.stack?.split('\n').slice(0, 3).join(' | ')
     });
     logger.error('========================================');
@@ -5722,6 +5851,99 @@ function toPublicSkuImagePath(skuFolder, filename) {
   return `/images/${skuFolder}/${filename}`;
 }
 
+// Derives a stable identity for a remote eBay image URL (by CDN image ID when
+// available) so two scrapes of the same listing can be compared without caring
+// about query-string/size-variant differences in the URL itself.
+function getRemoteImageKey(url) {
+  const normalized = String(url || '')
+    .trim()
+    .replace(/&amp;/g, '&')
+    .replace(/(\?|#).*$/, '');
+  const gMatch = normalized.match(/\/images\/g\/([^/]+)/i);
+  if (gMatch) return `g:${gMatch[1].toLowerCase()}`;
+  const zMatch = normalized.match(/\/z\/([^/]+)/i);
+  if (zMatch) return `z:${zMatch[1].toLowerCase()}`;
+  return `u:${normalized.toLowerCase()}`;
+}
+
+function getRemoteImageKeySet(urls) {
+  return new Set((Array.isArray(urls) ? urls : []).map(getRemoteImageKey));
+}
+
+function imageKeySetsMatch(a, b) {
+  if (a.size === 0 || b.size === 0 || a.size !== b.size) return false;
+  for (const key of a) {
+    if (!b.has(key)) return false;
+  }
+  return true;
+}
+
+function hasLocalSkuImages(skuFolder) {
+  const dir = path.join(__dirname, 'data', 'images', skuFolder);
+  if (!fs.existsSync(dir)) return false;
+  try {
+    return fs.readdirSync(dir).some((f) => /\.(jpe?g|png|webp|gif)$/i.test(f));
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearSkuImageFolder(skuFolder) {
+  const dir = path.join(__dirname, 'data', 'images', skuFolder);
+  if (!fs.existsSync(dir)) return;
+  try {
+    fs.emptyDirSync(dir);
+  } catch (_) {
+    // Best-effort; a failed cleanup just means old files linger alongside new ones.
+  }
+}
+
+// Renames a product's SKU-based image folder (and embedded filename tokens) on disk,
+// returning a Map of old public image path -> new public image path so callers can
+// remap any stored image URL arrays (images, imageSourceUrls, imagesOriginal, etc.).
+function renameProductSkuAssets(oldSku, newSku) {
+  const oldFolder = sanitizeSkuFolderName(oldSku) || 'NoSKU';
+  const newFolder = sanitizeSkuFolderName(newSku) || 'NoSKU';
+  const renameMap = new Map();
+
+  if (oldFolder === newFolder) {
+    return renameMap;
+  }
+
+  const oldDir = path.join(__dirname, 'data', 'images', oldFolder);
+  if (!fs.existsSync(oldDir)) {
+    return renameMap;
+  }
+
+  const newDir = path.join(__dirname, 'data', 'images', newFolder);
+  fs.ensureDirSync(newDir);
+
+  const tokenPattern = new RegExp(oldFolder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const files = fs.readdirSync(oldDir);
+
+  for (const file of files) {
+    const renamedFile = file.replace(tokenPattern, newFolder);
+    const sourcePath = path.join(oldDir, file);
+    const targetPath = path.join(newDir, renamedFile);
+    try {
+      fs.moveSync(sourcePath, targetPath, { overwrite: true });
+      renameMap.set(toPublicSkuImagePath(oldFolder, file), toPublicSkuImagePath(newFolder, renamedFile));
+    } catch (_) {
+      // Best-effort; leave file in place if the move fails.
+    }
+  }
+
+  try {
+    if (fs.readdirSync(oldDir).length === 0) {
+      fs.removeSync(oldDir);
+    }
+  } catch (_) {
+    // Ignore cleanup errors.
+  }
+
+  return renameMap;
+}
+
 function migrateLegacyImagePathToSku(imagePath, skuFolder) {
   const normalized = String(imagePath || '').trim();
   if (!normalized) return normalized;
@@ -5842,20 +6064,52 @@ function normalizeProductImageStorage(product) {
 }
 
 // Save product to data.json with intelligent merging
+// data.json is a single shared file that multiple concurrent scrape/save calls read
+// and rewrite. Without serialization, one call's read can land mid-write of another
+// call's write, see a truncated/partial file, and (if mishandled) write that emptiness
+// back out - destroying the whole product catalog. dataFileWriteQueue forces every
+// read-modify-write cycle against data.json through a single-file-at-a-time queue, and
+// atomicWriteJsonSync ensures a reader can never observe a half-written file in the
+// first place (write to temp file, then atomic rename).
+let dataFileWriteQueue = Promise.resolve();
+function withDataFileLock(fn) {
+  const result = dataFileWriteQueue.then(fn, fn);
+  dataFileWriteQueue = result.then(() => {}, () => {});
+  return result;
+}
+
+function atomicWriteJsonSync(filePath, data, options = {}) {
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  fs.writeJsonSync(tmpPath, data, options);
+  fs.renameSync(tmpPath, filePath);
+}
+
+function readDataFileOrThrow(dataFile) {
+  if (!fs.existsSync(dataFile)) {
+    return {};
+  }
+  const content = fs.readFileSync(dataFile, 'utf8');
+  const parsed = JSON.parse(content);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`data.json did not contain a valid product object (got ${Array.isArray(parsed) ? 'array' : typeof parsed})`);
+  }
+  return parsed;
+}
+
 async function saveProductToData(productData) {
+  return withDataFileLock(() => saveProductToDataUnlocked(productData));
+}
+
+async function saveProductToDataUnlocked(productData) {
   try {
     const dataFile = path.join(__dirname, 'data', 'data.json');
 
-    let existingData = {};
-    let initialProductCount = 0;
-    try {
-      const content = await fs.readFile(dataFile, 'utf8');
-      const parsed = JSON.parse(content);
-      existingData = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-      initialProductCount = Object.keys(existingData).length;
-    } catch (e) {
-      existingData = {};
-    }
+    // NOTE: intentionally NOT catching read/parse errors here and falling back to
+    // `{}` - a transient bad read must abort the save, never proceed as if the
+    // catalog were empty (that is exactly how a previous version of this function
+    // wiped 1000+ products down to a handful during concurrent scraping).
+    const existingData = readDataFileOrThrow(dataFile);
+    const initialProductCount = Object.keys(existingData).length;
 
     const productKey = productData.url || productData.link || productData.id || productData.sku;
     if (!productKey) {
@@ -5877,6 +6131,9 @@ async function saveProductToData(productData) {
       sku: productData.sku || (existingProduct && existingProduct.sku) || '',
       ebayCategoryId: productData.ebayCategoryId || (existingProduct && existingProduct.ebayCategoryId) || '',
       ebayCategory: productData.ebayCategory || (existingProduct && existingProduct.ebayCategory) || '',
+      categoryId: productData.categoryId || (existingProduct && existingProduct.categoryId) || (existingProduct && existingProduct.ebayCategoryId) || '',
+      weight: (productData.weight ?? (existingProduct && existingProduct.weight) ?? null),
+      weightUnit: (productData.weightUnit ?? (existingProduct && existingProduct.weightUnit) ?? null),
       // Update timestamps
       lastUpdated: now,
       lastScrapedAt: now,
@@ -5914,8 +6171,8 @@ async function saveProductToData(productData) {
       console.warn('Could not create backup before save, but continuing:', backupError.message);
     }
 
-    await fs.writeJson(dataFile, existingData, { spaces: 2 });
-    
+    atomicWriteJsonSync(dataFile, existingData, { spaces: 2 });
+
     // Clean old automatic backups (keep last 5 GOOD backups)
     try {
       const dataDir = path.dirname(dataFile);
@@ -7056,7 +7313,16 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     console.log(`Attempt ${attempt} for ${url}`);
 
-    const launchOptions = getBrowserLaunchOptions();
+    // Only one concurrent scrape can use the persistent, cookie-carrying profile at a
+    // time (Chrome locks userDataDir to a single running instance); others fall back to
+    // an ephemeral profile so concurrent scraping never collides on the lock.
+    const claimedPersistentProfile = !persistentProfileInUse;
+    if (claimedPersistentProfile) persistentProfileInUse = true;
+    const releasePersistentProfile = () => {
+      if (claimedPersistentProfile) persistentProfileInUse = false;
+    };
+
+    const launchOptions = getBrowserLaunchOptions(claimedPersistentProfile);
     try {
       console.log('[Puppeteer] Launching browser...');
       browser = await puppeteer.launch(launchOptions);
@@ -7072,17 +7338,49 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
           Object.entries(err).filter(([k]) => !['stack', 'message', 'name', 'cause'].includes(k))
         ) : {})
       });
+      releasePersistentProfile();
       const hint = 'Install Chrome, or run: npm install puppeteer (without PUPPETEER_SKIP_DOWNLOAD). See https://pptr.dev/troubleshooting';
       throw new Error(`Failed to launch the browser process: ${err.message}. ${hint}`);
     }
 
     console.log(`Browser launched for ${url}`);
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    // Use a current, real Chrome UA (the old hardcoded Chrome/91 string didn't match the
+    // actual bundled Chromium version, which is a classic bot-detection tell) and mask
+    // the most obvious headless-automation signals eBay's bot detection checks for.
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1366, height: 900 });
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-US,en;q=0.9',
+      'sec-ch-ua': '"Chromium";v="131", "Not_A Brand";v="24", "Google Chrome";v="131"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"'
+    });
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      window.chrome = window.chrome || { runtime: {} };
+    });
     console.log(`Page created for ${url}`);
     try {
-      
+
       await delay(SCRAPE_DELAY_PROFILE.beforeNavigate);
+
+      // Warm up the persistent-profile session by visiting eBay's homepage first,
+      // like an organic visitor, instead of teleporting straight to a deep /itm/ link
+      // with no referrer - that direct-to-deep-link pattern with a blank profile is
+      // itself a bot signal. Only done on the persistent-profile path (once per scrape
+      // slot) so it doesn't multiply request volume during concurrent bulk scraping.
+      if (claimedPersistentProfile) {
+        try {
+          console.log('Warming up session via eBay homepage...');
+          await page.goto('https://www.ebay.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+          await delay(1500 + Math.floor(Math.random() * 1500));
+        } catch (warmupErr) {
+          console.log('Homepage warm-up skipped:', warmupErr.message);
+        }
+      }
 
       console.log(`Navigating to ${url}`);
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -7218,7 +7516,7 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
                      document.querySelector('h1.it-ttl')?.textContent.trim() || 
                      document.title.split(' | ')[0] || 'N/A').replace(/\s+/g, ' ').trim();
 
-        const rawPrice = document.querySelector('#prcIsum')?.textContent.trim() || 
+        const rawPrice = document.querySelector('#prcIsum')?.textContent.trim() ||
                         document.querySelector('[data-testid="x-price-primary"]')?.textContent.trim() || 'N/A';
         const priceMatch = rawPrice.match(/\$([\d.,]+)/);
         const price = priceMatch ? parseFloat(priceMatch[1].replace(',', '')) : 'N/A';
@@ -7329,7 +7627,7 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
         const images = collectImageCandidates();
         
         // VALIDATE IMAGES: Filter out scam, logos, and suspicious images
-        const validatedImages = validateSourceImageUrls(images);
+        const validatedImages = validateImageUrls(images);
         const imageValidationLog = {
           collected: images.length,
           filtered: validatedImages.length,
@@ -7445,8 +7743,33 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
 
         // Additional fields
         const customLabel = itemSpecifics['Custom label'] || itemSpecifics['SKU'] || 'N/A';
-        const availableQuantity = document.querySelector('#qtySubTxt')?.textContent.trim() || 
-                                document.querySelector('#qtyAvail')?.textContent.trim() || 'N/A';
+
+        // Quantity: modern eBay listings hold the authoritative numeric quantity in the
+        // qty stepper's <input value="N">, with a human label ("Last one", "3 available")
+        // alongside it - not in the legacy #qtySubTxt/#qtyAvail IDs (which no longer exist
+        // on current listing pages, hence quantity always came back as "N/A" before this).
+        let availableQuantity = 'N/A';
+        const qtyInput = document.querySelector('#qtyTextBox') || document.querySelector('input[name="quantity"]');
+        if (qtyInput && qtyInput.value && /^\d+$/.test(qtyInput.value.trim())) {
+          availableQuantity = parseInt(qtyInput.value.trim(), 10);
+        } else {
+          const availabilityText = (document.querySelector('#qtyAvailability')?.textContent ||
+            document.querySelector('.x-quantity__availability')?.textContent || '').trim();
+          if (/last one/i.test(availabilityText)) {
+            availableQuantity = 1;
+          } else {
+            const numMatch = availabilityText.match(/(\d+)\s*available/i);
+            if (numMatch) {
+              availableQuantity = parseInt(numMatch[1], 10);
+            } else {
+              // Legacy fallback for older listing templates that may still use these IDs.
+              const legacyText = document.querySelector('#qtySubTxt')?.textContent.trim() ||
+                document.querySelector('#qtyAvail')?.textContent.trim() || '';
+              const legacyMatch = legacyText.match(/(\d+)/);
+              availableQuantity = legacyMatch ? parseInt(legacyMatch[1], 10) : 'N/A';
+            }
+          }
+        }
         const format = document.querySelector('.u-flL .notranslate')?.textContent.trim() || 
                       (document.querySelector('#bidBtn_btn') ? 'Auction' : 'Buy It Now');
         const currency = rawPrice.includes('US $') ? 'USD' : 'N/A';
@@ -7493,6 +7816,45 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
       }, url);
       console.log(`Data extracted: ${extractedData.images.length} images found (${extractedData.imageValidationLog?.removed || 0} suspicious images filtered)`)
 
+      // Guard against eBay serving an error/interstitial/CAPTCHA page instead of the
+      // real listing (rate-limiting, bot detection, "pardon our interruption", etc).
+      // Saving that as if it were real product data would overwrite good title/price/
+      // description/images with garbage - throw so the retry loop (and callers) treat
+      // this attempt as failed instead of persisting it.
+      const rawTitleLower = String(extractedData.title || '').toLowerCase();
+      const looksLikeErrorPage = /error page|robot check|pardon our interruption|security measure|verify you'?re human|are you a human|access denied|unusual traffic|captcha/i.test(rawTitleLower);
+      const looksLikeEmptyExtraction = extractedData.images.length === 0 &&
+        (!extractedData.description || String(extractedData.description).trim() === '') &&
+        extractedData.price === 'N/A';
+      if (looksLikeErrorPage || looksLikeEmptyExtraction) {
+        throw new Error(`Scrape landed on a non-product page for ${url} (title: "${extractedData.title}") - likely an eBay rate-limit/CAPTCHA/interstitial page, not the real listing`);
+      }
+
+      // Modern eBay listings frequently render the seller's actual rich-text
+      // description inside a separate iframe (commonly id="desc_ifr", domain
+      // ebaydesc.com) rather than directly in the main page DOM. document.querySelector
+      // inside page.evaluate() above can only ever see the heading/label text ("Item
+      // description from the seller") in that case, never the real content - so grab
+      // it here via Puppeteer's frame API (must happen before browser.close()) and use
+      // it if it's more substantial than what the main-page extraction found.
+      try {
+        const descriptionFrame = page.frames().find((frame) => {
+          const frameUrl = frame.url() || '';
+          const frameName = frame.name() || '';
+          return /desc/i.test(frameUrl) || /desc/i.test(frameName);
+        });
+        if (descriptionFrame) {
+          const iframeText = await descriptionFrame.evaluate(() => (document.body ? document.body.innerText : ''));
+          const cleanedIframeText = String(iframeText || '').replace(/\s+/g, ' ').trim();
+          if (cleanedIframeText.length > (extractedData.description || '').length) {
+            console.log(`Found richer description in iframe (${cleanedIframeText.length} chars vs ${(extractedData.description || '').length} from main page); using iframe content`);
+            extractedData.description = cleanedIframeText;
+          }
+        }
+      } catch (e) {
+        console.log('Description iframe extraction skipped:', e.message);
+      }
+
       // Apply SEO optimization with item specifics
       extractedData.itemSpecifics = {
         ...(extractedData.itemSpecifics || {}),
@@ -7506,6 +7868,7 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
       extractedData.description = makeSeoDescription(extractedData.description, extractedData.itemSpecifics, extractedData.title, extractedData);
 
       await browser.close();
+      releasePersistentProfile();
       console.log(`Browser closed for ${url}`);
 
       // Helper function to create SEO-friendly filenames
@@ -7536,73 +7899,146 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
       const seoSku = sanitizeForFilename(finalSku);
       const seoTitle = sanitizeForFilename(finalTitle);
 
-      const imagesOriginal = [];
-      const imagesEnhanced = [];
-      const imageSourceUrls = [];
-      for (let i = 0; i < extractedData.images.length; i++) {
-        const imgUrl = extractedData.images[i];
-        const ext = path.extname(imgUrl) || '.jpg';
-        // Create SEO-friendly filename: Strapey_{SKU}_{Title}_{index}.ext
-        const seoFilename = `Strapey_${seoSku}_${seoTitle}_${i}${ext}`;
-        const rawPath = path.join(productDir, seoFilename);
-        try {
-          console.log(`Downloading image ${i}: ${imgUrl}`);
-          const response = await axios.get(imgUrl, { responseType: 'stream', timeout: 10000 });
+      // Look up any existing record for this listing BEFORE touching images, so we can
+      // decide whether to skip (images unchanged), replace (images changed), or do a
+      // fresh download (no local images yet). This is a best-effort, unlocked read: if
+      // it races with another scrape's write and fails to parse, we simply treat the
+      // product as having no prior record (worst case: an unnecessary re-download,
+      // never data loss - the authoritative read+write below is lock-protected).
+      const dataFile = path.join('data', 'data.json');
+      let existing;
+      try {
+        existing = readDataFileOrThrow(dataFile)[url];
+      } catch (_) {
+        existing = undefined;
+      }
 
-          await new Promise((resolve, reject) => {
-            const writer = fs.createWriteStream(rawPath);
-            response.data.pipe(writer);
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
+      const newRemoteImageKeys = getRemoteImageKeySet(extractedData.images);
+      const previousRemoteImageKeys = getRemoteImageKeySet(existing?.remoteImageKeys);
+      const localImagesPresent = hasLocalSkuImages(folderSku);
 
-          console.log(`Downloaded image ${i} as ${seoFilename}`);
-          imagesOriginal.push(rawPath);
-          const enhancedPath = await processAndReplaceImage(rawPath);
-          imagesEnhanced.push(enhancedPath);
-          imageSourceUrls.push(`/images/${folderSku}/${path.basename(enhancedPath)}`);
-          console.log(`Processed image ${i}`);
-        } catch (e) {
-          console.error(`Failed to download or process ${imgUrl}: ${e.message}`);
-          if (fs.existsSync(rawPath)) {
-            imagesEnhanced.push(rawPath);
-            imageSourceUrls.push(`/images/${folderSku}/${path.basename(rawPath)}`);
+      let imagesOriginal = [];
+      let imageSourceUrls = [];
+      // Defaults to this scrape's keys; overridden below when we deliberately keep the
+      // prior image set untouched, so a failed/empty scrape can't poison future diffing.
+      let remoteImageKeysToPersist = Array.from(newRemoteImageKeys);
+
+      if (localImagesPresent && newRemoteImageKeys.size === 0) {
+        // This scrape found zero images - almost always a sign eBay served an error/
+        // interstitial/CAPTCHA page rather than the real listing, NOT that the seller
+        // removed every photo. Never let a failed extraction wipe out good local
+        // images; keep what we have and don't touch the recorded baseline.
+        imageSourceUrls = existing?.imageSourceUrls || existing?.images || [];
+        imagesOriginal = existing?.imagesOriginal || imageSourceUrls;
+        remoteImageKeysToPersist = Array.isArray(existing?.remoteImageKeys) ? existing.remoteImageKeys : [];
+        console.log(`Scrape returned 0 images for SKU ${folderSku} (likely a failed/blocked fetch); keeping ${imageSourceUrls.length} existing local images untouched`);
+      } else if (localImagesPresent && imageKeySetsMatch(newRemoteImageKeys, previousRemoteImageKeys)) {
+        // Same image set as last scrape (and we still have the files) - reuse local
+        // copies as-is instead of re-downloading/re-enhancing images that haven't changed.
+        imageSourceUrls = existing.imageSourceUrls || existing.images || [];
+        imagesOriginal = existing.imagesOriginal || imageSourceUrls;
+        console.log(`Images unchanged for SKU ${folderSku}; reusing ${imageSourceUrls.length} local images`);
+      } else {
+        // Either there are no local images yet, the recorded baseline doesn't match
+        // what eBay is serving now, or there's no baseline at all (e.g. a product that
+        // was only ever bulk-imported and never actually scraped before, so any local
+        // images are unverified leftovers, not something a prior real scrape confirmed).
+        // In every one of those cases this scrape just found a genuine, non-empty image
+        // set (the 0-image case above already ruled out a failed/blocked fetch) - trust
+        // it over untracked local files and do a full (re)download and replace.
+        if (localImagesPresent) {
+          console.log(`No confirmed-matching local images for SKU ${folderSku}; replacing with freshly scraped images`);
+          clearSkuImageFolder(folderSku);
+        }
+
+        for (let i = 0; i < extractedData.images.length; i++) {
+          const imgUrl = extractedData.images[i];
+          const ext = path.extname(imgUrl) || '.jpg';
+          // Create SEO-friendly filename: Strapey_{SKU}_{Title}_{index}.ext
+          const seoFilename = `Strapey_${seoSku}_${seoTitle}_${i}${ext}`;
+          const rawPath = path.join(productDir, seoFilename);
+          try {
+            console.log(`Downloading image ${i}: ${imgUrl}`);
+            const response = await axios.get(imgUrl, { responseType: 'stream', timeout: 10000 });
+
+            await new Promise((resolve, reject) => {
+              const writer = fs.createWriteStream(rawPath);
+              response.data.pipe(writer);
+              writer.on('finish', resolve);
+              writer.on('error', reject);
+            });
+
+            console.log(`Downloaded image ${i} as ${seoFilename}`);
+            imagesOriginal.push(rawPath);
+            const enhancedPath = await processAndReplaceImage(rawPath);
+            imageSourceUrls.push(`/images/${folderSku}/${path.basename(enhancedPath)}`);
+            console.log(`Processed image ${i}`);
+          } catch (e) {
+            console.error(`Failed to download or process ${imgUrl}: ${e.message}`);
+            if (fs.existsSync(rawPath)) {
+              imageSourceUrls.push(`/images/${folderSku}/${path.basename(rawPath)}`);
+            }
           }
         }
       }
 
+      // Quantity: use the freshly scraped number when we got one (this is the whole
+      // point of re-scraping - reflect eBay's current stock level). If extraction
+      // couldn't parse a number this time (e.g. an unusual listing layout), preserve
+      // whatever inventory value already existed rather than clobbering a good value
+      // with "N/A".
+      const scrapedQuantity = extractedData.availableQuantity;
+      const hasFreshQuantity = typeof scrapedQuantity === 'number' && Number.isFinite(scrapedQuantity);
+      const preservedQuantity = existing?.inventoryQuantity ?? existing?.inventory ?? existing?.availableQuantity;
+
       // Prepare data: include itemNumber and SKU; key by link (url)
       // Use provided SKU, or fall back to extracted customLabel from page
+      // 'N/A' is the extractor's own "nothing found on the page" sentinel (see
+      // categoryId init above) - it must never be treated as a real scraped value,
+      // otherwise it wins the `||` fallback chain ahead of a real existing category.
+      const cleanExtractedCategoryId = (extractedData.categoryId && extractedData.categoryId !== 'N/A')
+        ? extractedData.categoryId
+        : '';
       let productData = {
         ...extractedData,
         url,
         itemNumber: itemNumber || extractedData.itemNumber || '',
         sku: sku || extractedData.customLabel || '',
         customLabel: sku || extractedData.customLabel || '',
-        category: scrapeContext.category || scrapeContext.ebayCategory || extractedData.category || '',
-        ebayCategory: scrapeContext.category || scrapeContext.ebayCategory || extractedData.ebayCategory || '',
-        ebayCategoryId: scrapeContext.categoryId || scrapeContext.ebayCategoryId || extractedData.ebayCategoryId || '',
+        // Category almost never comes from the page itself (eBay's breadcrumb/JSON-LD
+        // category data is unreliable on modern listing pages - same story as the other
+        // stale selectors fixed today), so this is really "don't lose whatever category
+        // was already set" rather than "extract it fresh". Previously this only trusted
+        // scrapeContext (whatever the caller happened to pass in) with no fallback to the
+        // actual existing record, so if the caller ever failed to forward it, a real,
+        // already-set category/categoryId would be silently wiped on save.
+        category: scrapeContext.category || scrapeContext.ebayCategory || existing?.ebayCategory || existing?.category || '',
+        ebayCategory: scrapeContext.category || scrapeContext.ebayCategory || existing?.ebayCategory || existing?.category || '',
+        ebayCategoryId: scrapeContext.categoryId || scrapeContext.ebayCategoryId || cleanExtractedCategoryId || existing?.ebayCategoryId || existing?.categoryId || '',
+        categoryId: scrapeContext.categoryId || scrapeContext.ebayCategoryId || cleanExtractedCategoryId || existing?.categoryId || existing?.ebayCategoryId || '',
+        // Weight is rarely exposed as a page item-specific, so like category above, this
+        // is "don't lose whatever weight was already recorded" rather than "extract it
+        // fresh" - a rescrape that finds no weight label must not erase a known weight.
+        weight: (extractedData.weight ?? existing?.weight ?? null),
+        weightUnit: (extractedData.weightUnit ?? existing?.weightUnit ?? null),
+        availableQuantity: hasFreshQuantity ? scrapedQuantity : (preservedQuantity ?? scrapedQuantity),
+        inventoryQuantity: hasFreshQuantity ? scrapedQuantity : (preservedQuantity ?? 0),
         imageSourceUrls,
         images: imageSourceUrls,
-        imagesOriginal: imageSourceUrls,
+        imagesOriginal,
+        remoteImageKeys: remoteImageKeysToPersist,
         condition: 'NEW',
         conditionDisplay: 'New',
         lastUpdated: new Date().toISOString()
       };
       productData = applyProductGroup(forceNewConditionDefaults(productData));
 
-      const dataFile = path.join('data', 'data.json');
-      let allData = {};
-      if (fs.existsSync(dataFile)) {
-        allData = fs.readJsonSync(dataFile);
-      }
-
-      const existing = allData[url];
       const priceChanged = existing && existing.price !== productData.price;
       const titleChanged = existing && existing.title !== productData.title;
       const descriptionChanged = existing && existing.description !== productData.description;
       const itemNumberChanged = existing && (existing.itemNumber || '') !== (productData.itemNumber || '');
       const skuChanged = existing && (existing.customLabel || '') !== (productData.customLabel || '');
+      const inventoryChanged = existing && (existing.inventoryQuantity ?? existing.inventory ?? existing.availableQuantity) !== productData.inventoryQuantity;
       const existingSourceImages = Array.isArray(existing?.imageSourceUrls) ? existing.imageSourceUrls : [];
       const existingProcessedImages = Array.isArray(existing?.images) ? existing.images : [];
       const existingOriginalImages = Array.isArray(existing?.imagesOriginal) ? existing.imagesOriginal : [];
@@ -7613,14 +8049,20 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
       const ebayCategoryChanged = existing && (existing.ebayCategory || '') !== (productData.ebayCategory || '');
       const ebayCategoryIdChanged = existing && String(existing.ebayCategoryId || existing.categoryId || '') !== String(productData.ebayCategoryId || productData.categoryId || '');
 
-      if (!existing) {
-        allData[url] = productData;
-        fs.writeJsonSync(dataFile, allData);
-        console.log(`New record inserted for ${url}`);
-      } else if (priceChanged || titleChanged || descriptionChanged || itemNumberChanged || skuChanged || imagesChanged || processedImagesChanged || originalImagesChanged || productGroupChanged || ebayCategoryChanged || ebayCategoryIdChanged) {
-        allData[url] = productData;
-        fs.writeJsonSync(dataFile, allData);
-        console.log(`Data updated for ${url} (core fields/image metadata/group/category changed)`);
+      const hasChanges = priceChanged || titleChanged || descriptionChanged || itemNumberChanged || skuChanged ||
+        inventoryChanged || imagesChanged || processedImagesChanged || originalImagesChanged || productGroupChanged ||
+        ebayCategoryChanged || ebayCategoryIdChanged;
+
+      if (!existing || hasChanges) {
+        // Serialize against every other concurrent scrape/save call, and re-read the
+        // file fresh right before merging so we never clobber another product's
+        // update that landed while this scrape/download was in flight.
+        await withDataFileLock(() => {
+          const freshData = readDataFileOrThrow(dataFile);
+          freshData[url] = productData;
+          atomicWriteJsonSync(dataFile, freshData);
+        });
+        console.log(existing ? `Data updated for ${url} (core fields/image metadata/group/category changed)` : `New record inserted for ${url}`);
       } else {
         console.log(`No change for ${url}, skipped write`);
       }
@@ -7637,12 +8079,16 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
         }
         browser = null;
       }
+      releasePersistentProfile();
       if (attempt === maxRetries) {
         console.error(`All attempts failed for ${url}`);
         throw error;
       }
-      console.log(`Retrying in 5 seconds...`);
-      await delay(5000);
+      // Exponential-ish backoff instead of a flat 5s between attempts - hammering eBay
+      // with fast retries looks more bot-like and worsens rate-limit/WAF suspicion.
+      const backoffMs = 5000 * Math.pow(3, attempt - 1);
+      console.log(`Retrying in ${backoffMs / 1000} seconds...`);
+      await delay(backoffMs);
     }
   }
 }
@@ -8345,11 +8791,15 @@ app.post('/api/products/scrape-all', async (req, res) => {
     const allData = JSON.parse(fs.readFileSync(dataFile, 'utf8')) || {};
     const products = Object.entries(allData);
 
-    // Filter products that need scraping (24h stale) and satisfy product-data + inventory rules.
+    // Filter products that need scraping (24h stale) and have inventory to sell.
+    // NOTE: we intentionally do NOT require complete product data (title/price/
+    // description/images) here - scraping is exactly what fills in that missing
+    // data, so gating on it would permanently exclude any product that has never
+    // been successfully scraped (e.g. bulk-imported placeholders with no images).
+    // Publish-readiness is still enforced separately at publish time.
     const productsNeedingScrape = [];
     let upToDate = 0;
     let filteredNoInventory = 0;
-    let filteredMissingData = 0;
 
     for (const [link, product] of products) {
       if (!shouldScrapeProduct(product)) {
@@ -8363,26 +8813,17 @@ app.post('/api/products/scrape-all', async (req, res) => {
         continue;
       }
 
-      // Keep existing product-data filters (title, price, description, images)
-      // via the same publish validation helper used elsewhere.
-      const validation = validateProductForPublishing(product);
-      if (!validation.isValid) {
-        filteredMissingData++;
-        continue;
-      }
-
       productsNeedingScrape.push([link, product]);
     }
-    
+
     if (productsNeedingScrape.length === 0) {
       return res.json({
         success: true,
-        message: 'No products matched scrape criteria (24h stale + valid data + inventory > 0)',
+        message: 'No products matched scrape criteria (24h stale + inventory > 0)',
         totalProducts: products.length,
         needsScrape: 0,
         upToDate,
-        filteredNoInventory,
-        filteredMissingData
+        filteredNoInventory
       });
     }
     
@@ -8408,18 +8849,16 @@ app.post('/api/products/scrape-all', async (req, res) => {
       jobId,
       totalProducts: productsNeedingScrape.length,
       upToDate,
-      filteredNoInventory,
-      filteredMissingData
+      filteredNoInventory
     });
-    
+
     res.json({
       success: true,
       jobId,
       message: `Started scraping ${productsNeedingScrape.length} products`,
       totalProducts: productsNeedingScrape.length,
       upToDate,
-      filteredNoInventory,
-      filteredMissingData
+      filteredNoInventory
     });
     
     // Process scraping asynchronously
@@ -8904,6 +9343,321 @@ function calculateETA(job) {
     return `${Math.round(etaSeconds / 60)}m`;
   } else {
     return `${Math.round(etaSeconds / 3600)}h`;
+  }
+}
+
+// ============================================================================
+// FEATURE 3: EBAY -> LOCAL RECONCILIATION SYNC
+// Pulls the seller's real offer state from eBay, matches by SKU against
+// data.json, flags already-live products as Published, and pushes any local
+// price/quantity/content edits that haven't made it to eBay yet.
+// ============================================================================
+
+const ebaySyncJobs = new Map();
+
+function generateEbaySyncJobId() {
+  return 'ebay-sync-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// POST /api/products/sync-from-ebay - Reconcile local catalog against live eBay offers
+app.post('/api/products/sync-from-ebay', async (req, res) => {
+  const logger = createLogger('EbaySyncFromEbay');
+
+  try {
+    const { dryRun = true, environment = 'production', pushUpdates = true } = req.body || {};
+
+    logger.info('Starting eBay reconciliation sync', { dryRun, environment });
+
+    const token = await getEbayAccessToken({ environment });
+    const { apiBase } = getEbayBaseUrls({ environment });
+
+    const ebayInventorySkus = await fetchAllEbayInventorySkus(token, apiBase, { logger });
+    logger.info('Fetched eBay inventory SKUs', { totalSkus: ebayInventorySkus.size });
+
+    if (!fs.existsSync(DATA_FILE_PATH)) {
+      return res.json({ success: true, message: 'No local products to sync', totalMatched: 0 });
+    }
+
+    const allData = readDataFileOrThrow(DATA_FILE_PATH);
+
+    // Only fetch offer details (price/qty/status/listingId) for SKUs that exist
+    // both locally and on eBay - GET /offer requires a sku param per call, so we
+    // avoid one round-trip per eBay SKU that has no local counterpart.
+    const localSkuEntries = Object.entries(allData)
+      .map(([key, product]) => ({ key, product, sku: product.sku || product.customLabel }))
+      .filter(({ sku }) => sku && ebayInventorySkus.has(sku));
+
+    const ebayOffersBySku = new Map();
+    const offerLookupConcurrency = parseInt(process.env.PUBLISH_CONCURRENCY) || 2;
+    for (let i = 0; i < localSkuEntries.length; i += offerLookupConcurrency) {
+      const batch = localSkuEntries.slice(i, i + offerLookupConcurrency);
+      await Promise.all(batch.map(async ({ sku }) => {
+        try {
+          const offer = await fetchOfferForSku(sku, token, apiBase);
+          if (offer) ebayOffersBySku.set(sku, offer);
+        } catch (error) {
+          logger.warn('Failed to look up eBay offer for SKU', { sku, error: error.message });
+        }
+      }));
+    }
+    logger.info('Resolved eBay offer details', { matchedSkus: ebayOffersBySku.size });
+
+    const matchedSkus = new Set();
+    const toMarkPublished = [];
+    const toPushUpdate = [];
+    let unchangedCount = 0;
+
+    Object.entries(allData).forEach(([key, product]) => {
+      const sku = product.sku || product.customLabel;
+      if (!sku) return;
+      const offer = ebayOffersBySku.get(sku);
+      if (!offer) return;
+
+      matchedSkus.add(sku);
+
+      const isPublishedOnEbay = offer.status === 'PUBLISHED';
+      const alreadyReconciled = product.publishStatus === 'Published' && product.productionListingId === offer.listingId;
+
+      if (isPublishedOnEbay && !alreadyReconciled) {
+        toMarkPublished.push({ key, sku, offer });
+      }
+
+      if (isPublishedOnEbay) {
+        const localPrice = typeof product.price === 'number' ? product.price : Number(product.price);
+        const localQty = Number(product.inventoryQuantity ?? product.availableQuantity ?? product.inventory);
+        const priceChanged = offer.price !== null && Number.isFinite(localPrice) && Math.abs(offer.price - localPrice) > 0.001;
+        const quantityChanged = offer.quantity !== null && Number.isFinite(localQty) && localQty !== offer.quantity;
+        // Only trust the content-drift timestamp comparison once a real publish/sync
+        // baseline exists for this SKU. Without it, every never-before-reconciled
+        // product (the common case for this first run) would compare lastUpdated
+        // against epoch 0 and look "changed" even though nothing actually drifted.
+        const lastPushed = product.lastPublishedToProdAt || product.lastSyncedFromEbay;
+        const contentChanged = Boolean(lastPushed) && Boolean(product.lastUpdated) && new Date(product.lastUpdated) > new Date(lastPushed);
+
+        if (priceChanged || quantityChanged || contentChanged) {
+          toPushUpdate.push({ key, sku, product, reasons: { priceChanged, quantityChanged, contentChanged } });
+        } else {
+          unchangedCount++;
+        }
+      }
+    });
+
+    const unmatchedOnEbay = Array.from(ebayInventorySkus).filter((sku) => !matchedSkus.has(sku));
+
+    if (dryRun) {
+      return res.json({
+        success: true,
+        dryRun: true,
+        totalEbayOffers: ebayInventorySkus.size,
+        totalMatched: matchedSkus.size,
+        toMarkPublished: toMarkPublished.map(({ sku, offer }) => ({ sku, listingId: offer.listingId })),
+        toPushUpdate: toPushUpdate.map(({ sku, reasons }) => ({ sku, reasons })),
+        unchangedCount,
+        unmatchedOnEbayCount: unmatchedOnEbay.length,
+        unmatchedOnEbaySample: unmatchedOnEbay.slice(0, 20)
+      });
+    }
+
+    // Cheap status-reconciliation writes (no eBay calls needed) applied immediately.
+    if (toMarkPublished.length > 0) {
+      await withDataFileLock(async () => {
+        const dataFile = path.join(__dirname, 'data', 'data.json');
+        const beforeSize = fs.existsSync(dataFile) ? fs.statSync(dataFile).size : 0;
+        if (beforeSize > 1000) {
+          await fs.copy(dataFile, dataFile + `.backup-${Date.now()}`);
+        }
+
+        const currentData = readDataFileOrThrow(dataFile);
+        const initialCount = Object.keys(currentData).length;
+
+        toMarkPublished.forEach(({ key, offer }) => {
+          if (!currentData[key]) return;
+          currentData[key].publishStatus = 'Published';
+          currentData[key].status = 'Published';
+          currentData[key].productionListingId = offer.listingId;
+          currentData[key].productionLink = offer.listingId
+            ? `https://www.ebay.com/itm/${offer.listingId}`
+            : currentData[key].productionLink;
+          currentData[key].publishedToProduction = true;
+          currentData[key].latestPublishedListingId = offer.listingId || currentData[key].latestPublishedListingId || null;
+          currentData[key].latestPublishedLink = currentData[key].productionLink || currentData[key].latestPublishedLink || null;
+          currentData[key].lastPublishEnvironment = 'production';
+          currentData[key].lastSyncedFromEbay = new Date().toISOString();
+        });
+
+        const finalCount = Object.keys(currentData).length;
+        if (finalCount < initialCount) {
+          throw new Error(`Sync aborted: product count would drop from ${initialCount} to ${finalCount}`);
+        }
+
+        atomicWriteJsonSync(dataFile, currentData, { spaces: 2 });
+      });
+
+      logger.success('Marked products as Published from eBay reconciliation', { count: toMarkPublished.length });
+    }
+
+    if (toPushUpdate.length === 0 || !pushUpdates) {
+      return res.json({
+        success: true,
+        dryRun: false,
+        totalEbayOffers: ebayInventorySkus.size,
+        totalMatched: matchedSkus.size,
+        newlyPublishedCount: toMarkPublished.length,
+        updatedCount: 0,
+        skippedPushCount: pushUpdates ? 0 : toPushUpdate.length,
+        unchangedCount,
+        unmatchedOnEbayCount: unmatchedOnEbay.length,
+        message: !pushUpdates && toPushUpdate.length > 0
+          ? `Marked ${toMarkPublished.length} product(s) as Published. Skipped pushing ${toPushUpdate.length} drifted product(s) to eBay (pushUpdates=false).`
+          : toMarkPublished.length > 0
+          ? `Marked ${toMarkPublished.length} product(s) as Published. No price/quantity/content drift detected.`
+          : 'No changes needed. Local data is already in sync with eBay.'
+      });
+    }
+
+    const jobId = generateEbaySyncJobId();
+    const job = {
+      jobId,
+      status: 'running',
+      environment,
+      startedAt: new Date().toISOString(),
+      totalProducts: toPushUpdate.length,
+      processedCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      newlyPublishedCount: toMarkPublished.length,
+      unchangedCount,
+      unmatchedOnEbayCount: unmatchedOnEbay.length,
+      results: [],
+      errors: []
+    };
+    ebaySyncJobs.set(jobId, job);
+
+    res.json({
+      success: true,
+      dryRun: false,
+      jobId,
+      totalEbayOffers: ebayInventorySkus.size,
+      totalMatched: matchedSkus.size,
+      newlyPublishedCount: toMarkPublished.length,
+      toUpdateCount: toPushUpdate.length,
+      unchangedCount,
+      unmatchedOnEbayCount: unmatchedOnEbay.length,
+      message: `Marked ${toMarkPublished.length} product(s) as Published. Pushing ${toPushUpdate.length} update(s) to eBay...`
+    });
+
+    setImmediate(async () => {
+      await processEbaySyncPushJob(jobId, toPushUpdate, environment, logger);
+    });
+
+  } catch (error) {
+    logger.error('eBay reconciliation sync failed', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/products/sync-from-ebay/:jobId - Poll reconciliation push job status
+app.get('/api/products/sync-from-ebay/:jobId', (req, res) => {
+  const job = ebaySyncJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Job not found' });
+  }
+
+  const progress = job.totalProducts > 0
+    ? ((job.processedCount / job.totalProducts) * 100).toFixed(1)
+    : '100.0';
+
+  res.json({
+    success: true,
+    job: {
+      jobId: job.jobId,
+      status: job.status,
+      progress: `${progress}%`,
+      environment: job.environment,
+      processedCount: job.processedCount,
+      totalProducts: job.totalProducts,
+      successCount: job.successCount,
+      failureCount: job.failureCount,
+      newlyPublishedCount: job.newlyPublishedCount,
+      unchangedCount: job.unchangedCount,
+      unmatchedOnEbayCount: job.unmatchedOnEbayCount,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+      estimatedTimeRemaining: calculateETA(job),
+      recentResults: job.results.slice(-10),
+      recentErrors: job.errors.slice(-5)
+    }
+  });
+});
+
+// Push local price/quantity/content drift to eBay for already-matched, already-published SKUs.
+async function processEbaySyncPushJob(jobId, itemsToUpdate, environment, logger) {
+  const job = ebaySyncJobs.get(jobId);
+  if (!job) return;
+
+  const concurrency = parseInt(process.env.PUBLISH_CONCURRENCY) || 2;
+  const dataFile = path.join(__dirname, 'data', 'data.json');
+
+  try {
+    for (let i = 0; i < itemsToUpdate.length; i += concurrency) {
+      const batch = itemsToUpdate.slice(i, i + concurrency);
+
+      await Promise.all(batch.map(async ({ key, sku, product, reasons }) => {
+        const startTime = Date.now();
+        try {
+          const engine = getSmartPublishingEngine();
+          const publishResponse = await engine.retryWithLearning(
+            () => publishToEbay(product, { environment }),
+            product,
+            { link: key, sku, environment, source: 'ebay-reconciliation-sync' }
+          );
+
+          if (!publishResponse.success) {
+            throw new Error(publishResponse.error?.message || publishResponse.analysis?.errorMessage || 'Publish failed');
+          }
+
+          const result = publishResponse.result;
+
+          await withDataFileLock(async () => {
+            const currentData = readDataFileOrThrow(dataFile);
+            if (currentData[key]) {
+              currentData[key].productionListingId = result.listingId || currentData[key].productionListingId;
+              currentData[key].productionLink = result.listingLink || currentData[key].productionLink;
+              currentData[key].publishedToProduction = true;
+              currentData[key].publishStatus = 'Published';
+              currentData[key].status = 'Published';
+              currentData[key].lastPublishEnvironment = 'production';
+              currentData[key].lastPublishedToProdAt = new Date().toISOString();
+              currentData[key].lastSyncedFromEbay = new Date().toISOString();
+              atomicWriteJsonSync(dataFile, currentData, { spaces: 2 });
+            }
+          });
+
+          job.successCount++;
+          job.results.push({ sku, reasons, status: 'updated', duration: Date.now() - startTime });
+          logger.success('Pushed local changes to eBay', { sku, reasons });
+        } catch (error) {
+          job.failureCount++;
+          job.errors.push({ sku, error: error.message, timestamp: new Date().toISOString() });
+          logger.error('Failed to push local changes to eBay', { sku, error: error.message });
+        } finally {
+          job.processedCount++;
+        }
+      }));
+
+      if (i + concurrency < itemsToUpdate.length) {
+        const delayMs = parseInt(process.env.PUBLISH_BATCH_DELAY_MS) || 1000;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    job.status = 'completed';
+    job.completedAt = new Date().toISOString();
+  } catch (error) {
+    job.status = 'failed';
+    job.error = error.message;
+    job.completedAt = new Date().toISOString();
+    logger.error('eBay reconciliation push job failed', error);
   }
 }
 

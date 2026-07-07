@@ -75,13 +75,15 @@ function stripTrademarkSymbols(text) {
   }
 
   return text
-    .replace(/™/g, '')
+    .replace(/[™®]/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 /**
- * Sanitize product title - remove brands and add Strapey if not present
+ * Sanitize product title - remove competitor brands only. Does not force-add
+ * or remove "Strapey" - that's a content decision left to the caller/editor,
+ * not something this function should silently override on every save.
  */
 function sanitizeTitle(title) {
   if (!title || typeof title !== 'string') {
@@ -91,16 +93,8 @@ function sanitizeTitle(title) {
   // Remove competitor brands
   let sanitized = sanitizeBrandNames(title, { replaceWithStrapey: false });
 
-  // Add Strapey at the beginning if not already present
-  if (!sanitized.toLowerCase().includes('strapey')) {
-    sanitized = `Strapey ${sanitized}`;
-  }
-
   // Clean up and return
-  return sanitized
-    .replace(/™/g, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  return stripTrademarkSymbols(sanitized);
 }
 
 /**

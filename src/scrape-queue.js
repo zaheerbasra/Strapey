@@ -37,6 +37,8 @@ async function createScrapeJob(items, customLabel) {
       link: item.link || item.url || '',
       itemNumber: item.itemNumber || '',
       sku: item.sku || customLabel || '',
+      category: item.category || '',
+      categoryId: item.categoryId || '',
       status: 'pending',
       error: null,
       result: null,
