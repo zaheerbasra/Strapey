@@ -14,11 +14,14 @@ const { createLogger } = require('./logger');
 const scrapeQueue = require('./src/scrape-queue');
 const SmartPublishingEngine = require('./src/services/smart-publishing-engine');
 const EbayOrdersService = require('./src/ebay-orders-service');
+const EbayAccountFeesService = require('./src/ebay-account-fees-service');
+const ebayShippingLabelService = require('./src/ebay-shipping-label-service');
+const googleSheetsService = require('./src/google-sheets-service');
 const { registerWordpressIntegrationRoutes } = require('./src/integrations/wordpress-integration');
 const { applyProductGroup, detectProductGroup, getProductGroupLabel } = require('./src/utils/product-grouping');
 const { generateBrandedDescription, generateSeoTitle, getBrandConfig } = require('./src/utils/brand-content');
 const { addWatermark, isWatermarkingEnabled, getWatermarkSettings } = require('./src/utils/image-watermark');
-const { sanitizeProduct, sanitizeTitle, sanitizeDescription, stripTrademarkSymbols } = require('./src/utils/brand-sanitizer');
+const { sanitizeProduct, sanitizeTitle, sanitizeDescription, sanitizeDescriptionHtml, stripTrademarkSymbols } = require('./src/utils/brand-sanitizer');
 const { cleanProductImage } = require('./src/utils/image-cleaner');
 
 const app = express();
@@ -92,9 +95,12 @@ function getSmartPublishingEngine() {
 
 // Initialize eBay Orders Service
 let ebayOrdersService = null;
+let ebayAccountFeesService = null;
 function getEbayOrdersService() {
   if (!ebayOrdersService) {
     ebayOrdersService = new EbayOrdersService(getEbayRuntimeConfig, getEbayAccessToken);
+    ebayAccountFeesService = new EbayAccountFeesService(getEbayRuntimeConfig, getEbayAccessToken);
+    ebayOrdersService.setAccountFeesService(ebayAccountFeesService);
   }
   return ebayOrdersService;
 }
@@ -712,6 +718,42 @@ app.get('/api/products/:id', (req, res) => {
 });
 
 // ============================================================================
+// Shipping Labels - local index of labels purchased via ebay-shipping-label-service
+// ============================================================================
+
+const LABELS_DIR = path.join('data', 'labels');
+const LABELS_INDEX_PATH = path.join(LABELS_DIR, 'labels-index.json');
+
+function loadLabelsIndex() {
+  try {
+    if (!fs.existsSync(LABELS_INDEX_PATH)) return {};
+    return fs.readJsonSync(LABELS_INDEX_PATH) || {};
+  } catch (error) {
+    console.error('[ShippingLabel] Failed to read labels index:', error.message);
+    return {};
+  }
+}
+
+function saveLabelsIndex(index) {
+  fs.ensureDirSync(LABELS_DIR);
+  fs.writeJsonSync(LABELS_INDEX_PATH, index, { spaces: 2 });
+}
+
+function enrichOrdersWithLabelInfo(orders) {
+  if (!Array.isArray(orders)) return orders;
+  const labelsIndex = loadLabelsIndex();
+  return orders.map((order) => {
+    const label = labelsIndex[order.orderId];
+    if (!label) return { ...order, labelPurchased: false };
+    return {
+      ...order,
+      labelPurchased: true,
+      shippingLabelFee: label.price != null ? label.price : order.shippingLabelFee
+    };
+  });
+}
+
+// ============================================================================
 // eBay Orders API Endpoints
 // ============================================================================
 
@@ -724,7 +766,8 @@ app.get('/api/orders', async (req, res) => {
     const {
       source = 'ebay', // Future: support 'etsy', 'website'
       status = null,
-      limit = 200,
+      limit = 10,
+      offset = 0,
       forceRefresh = false,
       environment = null
     } = req.query;
@@ -741,6 +784,7 @@ app.get('/api/orders', async (req, res) => {
     const result = await ordersService.fetchOrders({
       environment,
       limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
       orderStatus: status,
       forceRefresh: forceRefresh === 'true' || forceRefresh === '1'
     });
@@ -748,7 +792,8 @@ app.get('/api/orders', async (req, res) => {
     return res.json({
       success: true,
       source,
-      ...result
+      ...result,
+      orders: enrichOrdersWithLabelInfo(result.orders)
     });
   } catch (error) {
     console.error('[OrdersAPI] Error fetching orders:', error);
@@ -826,6 +871,72 @@ app.post('/api/orders/refresh', async (req, res) => {
   }
 });
 
+// POST /api/orders/:orderId/purchase-label - Buy a USPS shipping label via
+// Puppeteer automation (see src/ebay-shipping-label-service.js), save the PDF
+// locally, and sync order + label to Google Sheets/Drive if configured.
+app.post('/api/orders/:orderId/purchase-label', async (req, res) => {
+  const { orderId } = req.params;
+  try {
+    const ordersService = getEbayOrdersService();
+    const { orders } = await ordersService.fetchOrders({ limit: 200, forceRefresh: false });
+    const order = orders.find((o) => o.orderId === orderId);
+    if (!order) {
+      return res.status(404).json({ success: false, error: `Order ${orderId} not found in cached orders.` });
+    }
+
+    const labelResult = await ebayShippingLabelService.purchaseShippingLabel(orderId);
+
+    const labelsIndex = loadLabelsIndex();
+    labelsIndex[orderId] = {
+      pdfPath: labelResult.pdfPath,
+      price: labelResult.price,
+      purchasedAt: labelResult.purchasedAt
+    };
+
+    let sheetUpdated = false;
+    if (googleSheetsService.isConfigured()) {
+      try {
+        const upload = await googleSheetsService.uploadLabelToDrive(orderId, labelResult.pdfPath);
+        await googleSheetsService.insertOrderRowAtTop({
+          orderId: order.orderId,
+          date: new Date(order.creationDate).toLocaleDateString(),
+          buyerId: order.buyer?.username || '',
+          buyerName: order.shippingAddress?.fullName || order.buyer?.name || '',
+          sku: order.lineItems?.[0]?.sku || '',
+          qty: order.lineItems?.[0]?.quantity || 0,
+          salePrice: order.orderTotal ?? '',
+          orderEarnings: order.orderEarnings ?? '',
+          ebayCharges: order.ebayCharges ?? '',
+          shipping: labelResult.price ?? '',
+          adFee: order.adFee ?? ''
+        }, upload.webViewLink);
+        labelsIndex[orderId].driveFileId = upload.fileId;
+        sheetUpdated = true;
+      } catch (sheetError) {
+        console.error('[ShippingLabel] Google Sheets sync failed:', sheetError.message);
+        labelsIndex[orderId].sheetSyncError = sheetError.message;
+      }
+    }
+
+    saveLabelsIndex(labelsIndex);
+
+    return res.json({
+      success: true,
+      orderId,
+      price: labelResult.price,
+      labelUrl: `/data/labels/${orderId}/label.pdf`,
+      sheetUpdated
+    });
+  } catch (error) {
+    console.error('[ShippingLabel] Purchase failed:', error);
+    return res.status(error.errorType === 'session_expired' ? 401 : 500).json({
+      success: false,
+      error: error.message,
+      errorType: error.errorType || 'unknown'
+    });
+  }
+});
+
 // ============================================================================
 // End eBay Orders API
 // ============================================================================
@@ -883,9 +994,9 @@ app.put('/api/products/:id', async (req, res) => {
     if (req.body.inventory !== undefined) product.inventoryQuantity = req.body.inventory;
     if (req.body.description !== undefined) {
       if (Array.isArray(req.body.description)) {
-        product.description = req.body.description.map((line) => sanitizeDescription(String(line || '')));
+        product.description = req.body.description.map((line) => sanitizeDescriptionHtml(sanitizeDescription(String(line || ''))));
       } else {
-        product.description = sanitizeDescription(String(req.body.description || ''));
+        product.description = sanitizeDescriptionHtml(sanitizeDescription(String(req.body.description || '')));
       }
     }
     if (req.body.productGroup !== undefined) product.productGroup = req.body.productGroup;
@@ -941,89 +1052,94 @@ app.delete('/api/products/:url', async (req, res) => {
 });
 
 
+// Brand keywords and patterns stripped from every outbound title/description -
+// covers our own "Strapey" branding as well as source-site brands ("Shard
+// Blade", "Lorandos") so neither ever reaches an eBay listing. Shared by the
+// manual "SEO Cleanup All" admin action and the automatic cleanup applied on
+// every publish/sync to eBay (see optimizeTextForSeo below).
+const SEO_BRAND_REMOVE_PATTERNS = [
+  /SHARD\s*BLADE?/gi,
+  /Shard\s*-?\s*Blade?/gi,
+  /-?Blade\s+/gi,  // Remove "-Blade " or "Blade " from start
+  /Lorandos/gi,
+  /\bShard\b/gi,
+  /\bstrapey\s*[®™]?\b/gi
+];
+
+// Clean and optimize text (title or description) for SEO. Removes brand
+// keywords/trademark symbols and applies title-case/length rules for titles.
+function optimizeTextForSeo(text, type = 'title') {
+  if (!text) return text;
+
+  let optimized = text;
+
+  // Remove brand patterns
+  SEO_BRAND_REMOVE_PATTERNS.forEach(pattern => {
+    optimized = optimized.replace(pattern, '');
+  });
+
+  // Remove trademark symbols (®, ™) across both title and description
+  optimized = stripTrademarkSymbols(optimized);
+
+  // Clean up extra spaces and punctuation
+  optimized = optimized.replace(/\s+/g, ' ').trim();
+  optimized = optimized.replace(/\s*-\s*-\s*/g, ' - '); // Fix double dashes
+  optimized = optimized.replace(/^\s*-\s*/, ''); // Remove leading dash
+  optimized = optimized.replace(/\s*-\s*$/, ''); // Remove trailing dash
+
+  // Strip any leftover leading punctuation/symbols (e.g. a stray "® " left
+  // behind once the brand name in front of it was removed) so the string
+  // always starts on an actual word character.
+  optimized = optimized.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+
+  if (type === 'title') {
+    // Title case for better readability and SEO
+    optimized = optimized.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+
+    // Fix common abbreviations that should stay uppercase
+    const uppercaseTerms = [
+      'USA', 'UK', 'US', 'EU',
+      'Damascus', 'Steel',
+      'Hand Forged', 'Hand-Forged',
+      'Custom', 'Handmade',
+      'Carbon', 'Stainless',
+      'VG10', 'D2'
+    ];
+
+    uppercaseTerms.forEach(term => {
+      const regex = new RegExp('\\b' + term + '\\b', 'gi');
+      optimized = optimized.replace(regex, term);
+    });
+
+    // Ensure title isn't too long (eBay recommends 80 chars)
+    if (optimized.length > 80) {
+      optimized = optimized.substring(0, 77) + '...';
+    }
+  } else if (type === 'description') {
+    // For descriptions, just clean up the text without title case
+    // Ensure proper sentence capitalization
+    optimized = optimized.replace(/\.\s+([a-z])/g, (match, char) => '. ' + char.toUpperCase());
+
+    // Capitalize first letter
+    if (optimized.length > 0) {
+      optimized = optimized.charAt(0).toUpperCase() + optimized.slice(1);
+    }
+  }
+
+  return optimized;
+}
+
 // API: Bulk cleanup titles and descriptions with SEO optimization
 app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
   try {
     if (!fs.existsSync(DATA_FILE_PATH)) {
       return res.json({ updated: 0 });
     }
-    
+
     const allData = fs.readJsonSync(DATA_FILE_PATH);
     let updated = 0;
     const details = [];
-    
-    // Brand keywords and patterns to remove
-    const removeBrandPatterns = [
-      /SHARD\s*BLADE?/gi,
-      /Shard\s*-?\s*Blade?/gi,
-      /-?Blade\s+/gi,  // Remove "-Blade " or "Blade " from start
-      /Lorandos/gi,
-      /\bShard\b/gi,
-      /\bstrapey\s*[®™]?\b/gi
-    ];
-    
-    // Function to clean and optimize text for SEO
-    function optimizeForSEO(text, type = 'title') {
-      if (!text) return text;
-      
-      let optimized = text;
-      
-      // Remove brand patterns
-      removeBrandPatterns.forEach(pattern => {
-        optimized = optimized.replace(pattern, '');
-      });
 
-      // Remove trademark symbols (®, ™) across both title and description
-      optimized = stripTrademarkSymbols(optimized);
-
-      // Clean up extra spaces and punctuation
-      optimized = optimized.replace(/\s+/g, ' ').trim();
-      optimized = optimized.replace(/\s*-\s*-\s*/g, ' - '); // Fix double dashes
-      optimized = optimized.replace(/^\s*-\s*/, ''); // Remove leading dash
-      optimized = optimized.replace(/\s*-\s*$/, ''); // Remove trailing dash
-
-      // Strip any leftover leading punctuation/symbols (e.g. a stray "® " left
-      // behind once the brand name in front of it was removed) so the string
-      // always starts on an actual word character.
-      optimized = optimized.replace(/^[^\p{L}\p{N}]+/u, '').trim();
-      
-      if (type === 'title') {
-        // Title case for better readability and SEO
-        optimized = optimized.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
-        
-        // Fix common abbreviations that should stay uppercase
-        const uppercaseTerms = [
-          'USA', 'UK', 'US', 'EU',
-          'Damascus', 'Steel',
-          'Hand Forged', 'Hand-Forged',
-          'Custom', 'Handmade',
-          'Carbon', 'Stainless',
-          'VG10', 'D2'
-        ];
-        
-        uppercaseTerms.forEach(term => {
-          const regex = new RegExp('\\b' + term + '\\b', 'gi');
-          optimized = optimized.replace(regex, term);
-        });
-        
-        // Ensure title isn't too long (eBay recommends 80 chars)
-        if (optimized.length > 80) {
-          optimized = optimized.substring(0, 77) + '...';
-        }
-      } else if (type === 'description') {
-        // For descriptions, just clean up the text without title case
-        // Ensure proper sentence capitalization
-        optimized = optimized.replace(/\.\s+([a-z])/g, (match, char) => '. ' + char.toUpperCase());
-        
-        // Capitalize first letter
-        if (optimized.length > 0) {
-          optimized = optimized.charAt(0).toUpperCase() + optimized.slice(1);
-        }
-      }
-      
-      return optimized;
-    }
-    
     // Function to generate SEO keywords from title
     function generateSEOKeywords(title) {
       if (!title) return [];
@@ -1056,14 +1172,14 @@ app.post('/api/products/bulk/cleanup-titles', async (req, res) => {
       const originalDescription = product.description || '';
       
       // Optimize title
-      const optimizedTitle = optimizeForSEO(originalTitle, 'title');
-      
+      const optimizedTitle = optimizeTextForSeo(originalTitle, 'title');
+
       // Optimize description (handle both string and array formats)
       let optimizedDescription = originalDescription;
       if (Array.isArray(originalDescription)) {
-        optimizedDescription = originalDescription.map(desc => optimizeForSEO(desc, 'description'));
+        optimizedDescription = originalDescription.map(desc => optimizeTextForSeo(desc, 'description'));
       } else if (typeof originalDescription === 'string') {
-        optimizedDescription = optimizeForSEO(originalDescription, 'description');
+        optimizedDescription = optimizeTextForSeo(originalDescription, 'description');
       }
       
       // Generate SEO metadata
@@ -1237,6 +1353,7 @@ app.post('/api/products/:id/publish/sandbox', async (req, res) => {
       allData[productKey].publishedLink = result.listingLink;
       allData[productKey].sandboxListingId = result.listingId;
       allData[productKey].lastPublishedAt = new Date().toISOString();
+      if (!allData[productKey].ebaySku) allData[productKey].ebaySku = result.ebaySku || result.sku;
       fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
 
       appendProductActivityLog({
@@ -1298,6 +1415,7 @@ app.post('/api/products/:id/publish/production', async (req, res) => {
       allData[productKey].lastPublishedLink = result.listingLink || null;
       allData[productKey].lastPublishedItemNumber = result.listingId || null;
       allData[productKey].lastPublishedToProdAt = new Date().toISOString();
+      if (!allData[productKey].ebaySku) allData[productKey].ebaySku = result.ebaySku || result.sku;
       fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
 
       appendProductActivityLog({
@@ -1373,6 +1491,7 @@ app.post('/api/products/:id/publish/active', async (req, res) => {
         allData[productKey].lastPublishedAt = new Date().toISOString();
       }
       allData[productKey].publishAction = runtimeMode;
+      if (!allData[productKey].ebaySku) allData[productKey].ebaySku = result.ebaySku || result.sku;
       fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
 
       appendProductActivityLog({
@@ -1396,6 +1515,229 @@ app.post('/api/products/:id/publish/active', async (req, res) => {
     });
   } catch (error) {
     console.error('Error publishing to active runtime environment:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+const skuRelistJobs = new Map();
+
+function generateSkuRelistJobId() {
+  return 'sku-relist-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+async function processSkuRelistJob(jobId, items, logger) {
+  const job = skuRelistJobs.get(jobId);
+  if (!job) return;
+
+  const concurrency = 1; // sequential: each item ends a live listing then creates a new one - avoid overlapping withdraw/publish races
+  const dataFile = path.join(__dirname, 'data', 'data.json');
+
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    await Promise.all(batch.map(async ({ key, sku }) => {
+      const startTime = Date.now();
+      try {
+        const currentData = readDataFileOrThrow(dataFile);
+        const product = currentData[key];
+        if (!product) throw new Error('Product no longer exists');
+
+        const result = await syncProductSkuToEbay(product, { environment: 'production' });
+
+        if (result.action === 'RELISTED') {
+          await withDataFileLock(async () => {
+            const data = readDataFileOrThrow(dataFile);
+            if (!data[key]) return;
+            data[key].previousProductionListingId = result.oldListingId || data[key].productionListingId || null;
+            data[key].previousEbaySku = result.oldSku;
+            data[key].ebaySku = result.newSku;
+            data[key].productionLink = result.listingLink;
+            data[key].productionListingId = result.listingId;
+            data[key].publishedToProduction = true;
+            data[key].publishStatus = 'Published';
+            data[key].status = 'Published';
+            data[key].latestPublishedListingId = result.listingId || null;
+            data[key].latestPublishedLink = result.listingLink || null;
+            data[key].lastPublishEnvironment = 'production';
+            data[key].lastPublishedListingId = result.listingId || null;
+            data[key].lastPublishedLink = result.listingLink || null;
+            data[key].lastPublishedItemNumber = result.listingId || null;
+            data[key].lastPublishedToProdAt = new Date().toISOString();
+            data[key].skuRelistHistory = Array.isArray(data[key].skuRelistHistory) ? data[key].skuRelistHistory : [];
+            data[key].skuRelistHistory.push({
+              oldSku: result.oldSku, newSku: result.newSku,
+              oldListingId: result.oldListingId, newListingId: result.listingId,
+              relistedAt: new Date().toISOString()
+            });
+            atomicWriteJsonSync(dataFile, data, { spaces: 2 });
+          });
+        }
+
+        job.successCount++;
+        job.results.push({ sku, action: result.action, oldListingId: result.oldListingId, newListingId: result.listingId, duration: Date.now() - startTime });
+        logger.success('SKU relisted', { sku, action: result.action });
+      } catch (error) {
+        job.failureCount++;
+        job.errors.push({ sku, error: error.message, timestamp: new Date().toISOString() });
+        logger.error('SKU relist failed', { sku, error: error.message });
+      } finally {
+        job.processedCount++;
+      }
+    }));
+  }
+
+  job.status = 'completed';
+  job.completedAt = new Date().toISOString();
+}
+
+// API: Bulk-sync local SKUs to eBay for every mismatched product (defaults to
+// Pistol Parts grips; pass productIds to scope explicitly, e.g. a test batch).
+app.post('/api/products/bulk/sync-sku-to-ebay', async (req, res) => {
+  try {
+    const allData = fs.existsSync(DATA_FILE_PATH) ? fs.readJsonSync(DATA_FILE_PATH) : {};
+    const requestedIds = Array.isArray(req.body?.productIds) ? req.body.productIds : null;
+
+    let items;
+    if (requestedIds) {
+      items = requestedIds
+        .map((id) => {
+          const key = findProductKeyById(allData, id);
+          if (!key) return null;
+          const product = allData[key];
+          const adminSku = product.customLabel || product.sku;
+          return { key, sku: adminSku };
+        })
+        .filter(Boolean);
+    } else {
+      items = Object.entries(allData)
+        .filter(([key, product]) => {
+          const isGrip = product.category === 'Pistol Parts' || product.productGroup === 'pistol-parts';
+          const adminSku = product.customLabel || product.sku;
+          return isGrip && product.ebaySku && adminSku && product.ebaySku !== adminSku;
+        })
+        .map(([key, product]) => ({ key, sku: product.customLabel || product.sku }));
+    }
+
+    if (items.length === 0) {
+      return res.json({ success: true, message: 'No products need a SKU relist.', total: 0 });
+    }
+
+    const jobId = generateSkuRelistJobId();
+    const logger = createLogger('SkuRelistBulk');
+    const job = {
+      jobId,
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      totalProducts: items.length,
+      processedCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      results: [],
+      errors: []
+    };
+    skuRelistJobs.set(jobId, job);
+
+    res.json({
+      success: true,
+      jobId,
+      total: items.length,
+      message: `Relisting ${items.length} product(s) with updated SKUs...`
+    });
+
+    setImmediate(async () => {
+      await processSkuRelistJob(jobId, items, logger);
+    });
+  } catch (error) {
+    console.error('Error starting bulk SKU relist:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/products/bulk/sync-sku-to-ebay/:jobId', (req, res) => {
+  const job = skuRelistJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Job not found' });
+  }
+  const progress = job.totalProducts > 0 ? ((job.processedCount / job.totalProducts) * 100).toFixed(1) : '100.0';
+  res.json({
+    success: true,
+    job: {
+      jobId: job.jobId,
+      status: job.status,
+      progress: `${progress}%`,
+      processedCount: job.processedCount,
+      totalProducts: job.totalProducts,
+      successCount: job.successCount,
+      failureCount: job.failureCount,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+      recentResults: job.results.slice(-10),
+      recentErrors: job.errors.slice(-5)
+    }
+  });
+});
+
+// API: Sync a product's local SKU to eBay by withdrawing the listing published
+// under the old SKU and publishing a fresh one under the current admin SKU.
+// Destructive: new item number, loses that listing's watcher/view/sales
+// history, brief window offline. Only call this on explicit user request -
+// never as a side effect of routine publish/update.
+// NOTE: registered after /api/products/bulk/sync-sku-to-ebay so Express
+// doesn't match "bulk" as this route's :id param.
+app.post('/api/products/:id/sync-sku-to-ebay', async (req, res) => {
+  try {
+    const allData = fs.existsSync(DATA_FILE_PATH) ? fs.readJsonSync(DATA_FILE_PATH) : {};
+    const productKey = findProductKeyById(allData, req.params.id);
+
+    if (!productKey) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = allData[productKey];
+    const result = await syncProductSkuToEbay(product, { environment: 'production' });
+
+    if (result.action === 'RELISTED') {
+      allData[productKey].previousProductionListingId = result.oldListingId || allData[productKey].productionListingId || null;
+      allData[productKey].previousEbaySku = result.oldSku;
+      allData[productKey].ebaySku = result.newSku;
+      allData[productKey].productionLink = result.listingLink;
+      allData[productKey].productionListingId = result.listingId;
+      allData[productKey].publishedToProduction = true;
+      allData[productKey].publishStatus = 'Published';
+      allData[productKey].status = 'Published';
+      allData[productKey].latestPublishedListingId = result.listingId || null;
+      allData[productKey].latestPublishedLink = result.listingLink || null;
+      allData[productKey].lastPublishEnvironment = 'production';
+      allData[productKey].lastPublishedListingId = result.listingId || null;
+      allData[productKey].lastPublishedLink = result.listingLink || null;
+      allData[productKey].lastPublishedItemNumber = result.listingId || null;
+      allData[productKey].lastPublishedToProdAt = new Date().toISOString();
+      allData[productKey].skuRelistHistory = Array.isArray(allData[productKey].skuRelistHistory)
+        ? allData[productKey].skuRelistHistory
+        : [];
+      allData[productKey].skuRelistHistory.push({
+        oldSku: result.oldSku,
+        newSku: result.newSku,
+        oldListingId: result.oldListingId,
+        newListingId: result.listingId,
+        relistedAt: new Date().toISOString()
+      });
+      fs.writeJsonSync(DATA_FILE_PATH, allData, { spaces: 2 });
+
+      appendProductActivityLog({
+        productId: req.params.id,
+        actionType: 'PRODUCT_SKU_RELISTED',
+        actionDescription: `SKU relisted on eBay: "${result.oldSku}" -> "${result.newSku}" (old listing ${result.oldListingId} -> new listing ${result.listingId})`,
+        sourceSystem: 'sku-relist-api',
+        newValue: { oldSku: result.oldSku, newSku: result.newSku, oldListingId: result.oldListingId, newListingId: result.listingId }
+      });
+    }
+
+    return res.json(result);
+  } catch (error) {
+    console.error('Error syncing SKU to eBay:', error);
     return res.status(500).json({
       success: false,
       error: error.message
@@ -2022,6 +2364,47 @@ function makeSeoTitle(raw, itemSpecifics = {}) {
   return t || 'Product';
 }
 
+/**
+ * Truncate a description to maxLength without corrupting HTML. Plain text is
+ * hard-truncated as before; HTML is cut at the last complete tag at/under the
+ * limit and any tags left open at that point are closed, so a truncated
+ * description never ships to eBay as malformed markup (unclosed <div>/<table>
+ * can otherwise break the rest of the listing page's layout).
+ */
+function truncateHtmlSafely(html, maxLength) {
+  const str = String(html || '');
+  if (str.length <= maxLength) return str;
+
+  if (!/<[a-z][\s\S]*>/i.test(str)) {
+    return str.substring(0, Math.max(0, maxLength - 3)).trim() + '...';
+  }
+
+  let cut = str.substring(0, maxLength);
+  const lastClose = cut.lastIndexOf('>');
+  if (lastClose !== -1) cut = cut.substring(0, lastClose + 1);
+
+  const voidTags = new Set(['br', 'img', 'hr', 'input', 'meta', 'link']);
+  const openTags = [];
+  const tagPattern = /<\/?([a-z0-9]+)[^>]*?(\/?)>/gi;
+  let match;
+  while ((match = tagPattern.exec(cut))) {
+    const [full, tagName, selfClosingSlash] = match;
+    const name = tagName.toLowerCase();
+    if (selfClosingSlash || voidTags.has(name)) continue;
+    if (full.startsWith('</')) {
+      const idx = openTags.lastIndexOf(name);
+      if (idx !== -1) openTags.splice(idx, 1);
+    } else {
+      openTags.push(name);
+    }
+  }
+
+  for (let i = openTags.length - 1; i >= 0; i--) {
+    cut += `</${openTags[i]}>`;
+  }
+  return cut;
+}
+
 /** SEO-friendly description: structure, keywords, full content, remove eBay boilerplate */
 const DESCRIPTION_MAX_LENGTH = 20000;
 
@@ -2058,39 +2441,51 @@ function makeSeoDescription(raw, itemSpecifics = {}, title = '', product = {}) {
       });
       
       if (branded && branded.length > 0) {
-        return branded.substring(0, DESCRIPTION_MAX_LENGTH);
+        return truncateHtmlSafely(branded, DESCRIPTION_MAX_LENGTH);
       }
     } catch (error) {
       console.warn('Failed to generate branded description, using fallback:', error.message);
     }
   }
-  
-  // Fallback: Build enhanced description with structure
-  let enhanced = d;
-  
-  // Add key specifications if available
+
+  // Fallback (no product-group classification): still build a styled HTML
+  // block so descriptions always look intentional rather than a wall of text.
+  const looksLikeHtml = /<[a-z][\s\S]*>/i.test(d);
+  const bodyHtml = looksLikeHtml
+    ? d
+    : String(d || '')
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .map((p) => `<p style="margin:0 0 14px;">${escapeXml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('') || `<p style="margin:0 0 14px;">${escapeXml(title || 'Quality product')}</p>`;
+
+  // Key specifications, if available
   const specs = [];
-  if (itemSpecifics.Brand) specs.push(`Brand: ${itemSpecifics.Brand}`);
-  if (itemSpecifics['Blade Material']) specs.push(`Material: ${itemSpecifics['Blade Material']}`);
-  if (itemSpecifics['Blade Type']) specs.push(`Type: ${itemSpecifics['Blade Type']}`);
-  if (itemSpecifics.Color) specs.push(`Color: ${itemSpecifics.Color}`);
-  // Business rule: all outbound listings are published as New condition.
-  specs.push('Condition: New');
-  if (itemSpecifics.Handmade) specs.push(`Handmade: Yes`);
-  if (itemSpecifics['Country of Origin']) specs.push(`Origin: ${itemSpecifics['Country of Origin']}`);
-  
-  if (specs.length > 0) {
-    enhanced = `${d}\n\nKey Features:\n${specs.join(' • ')}\n\nProduct Details: This premium item combines quality craftsmanship with exceptional durability. Perfect for collectors and professionals alike.`;
-  } else {
-    enhanced = `${d}\n\nThis is a premium quality product designed for discerning buyers who appreciate excellence and durability.`;
-  }
-  
-  // Truncate if necessary
-  if (enhanced.length > DESCRIPTION_MAX_LENGTH) {
-    enhanced = enhanced.substring(0, DESCRIPTION_MAX_LENGTH - 3).trim() + '...';
-  }
-  
-  return enhanced;
+  if (itemSpecifics.Brand) specs.push(['Brand', itemSpecifics.Brand]);
+  if (itemSpecifics['Blade Material']) specs.push(['Material', itemSpecifics['Blade Material']]);
+  if (itemSpecifics['Blade Type']) specs.push(['Type', itemSpecifics['Blade Type']]);
+  if (itemSpecifics.Color) specs.push(['Color', itemSpecifics.Color]);
+  specs.push(['Condition', 'New']); // Business rule: all outbound listings are published as New condition.
+  if (itemSpecifics.Handmade) specs.push(['Handmade', 'Yes']);
+  if (itemSpecifics['Country of Origin']) specs.push(['Origin', itemSpecifics['Country of Origin']]);
+
+  const specsHtml = `
+    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin:20px 0;">
+      <h3 style="margin:0 0 12px;color:#111827;font-size:16px;">Key Features</h3>
+      <ul style="margin:0;padding-left:20px;color:#374151;font-size:14px;">
+        ${specs.map(([label, value]) => `<li style="margin-bottom:6px;"><strong>${escapeXml(label)}:</strong> ${escapeXml(value)}</li>`).join('')}
+      </ul>
+    </div>`;
+
+  const enhanced = `
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:0 auto;color:#1f2937;line-height:1.6;font-size:15px;">
+      ${bodyHtml}
+      ${specsHtml}
+      <p style="margin-top:8px;color:#374151;">This is a premium quality product designed for discerning buyers who appreciate excellence and durability.</p>
+    </div>`.trim();
+
+  return truncateHtmlSafely(enhanced, DESCRIPTION_MAX_LENGTH);
 }
 
 function forceNewConditionDefaults(product = {}) {
@@ -3000,33 +3395,33 @@ async function convertToEbayHostedImageUrls(imageUrls, token, logger = null) {
 }
 
 /**
- * Check if an offer/listing already exists for the given SKU
+ * Check if an offer/listing already exists for the given SKU.
+ * Queries eBay filtered by `sku` directly (GET /offer?sku=) rather than
+ * fetching an unpaginated page of offers and matching client-side - with
+ * hundreds of live offers, the old `limit: 100, find in JS` approach could
+ * miss offers past the first page and falsely report "not found", which
+ * pushed every publish down the create-new-listing path.
  */
 async function findExistingOffer(sku, token, apiBase) {
 
   try {
-    // Search for offers by SKU - eBay limits queries, so we use a basic approach
     const response = await axios.get(`${apiBase}/sell/inventory/v1/offer`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Content-Language': 'en-US'
       },
-      params: {
-        format: 'FIXED_PRICE',
-        limit: 100
-      },
+      params: { sku },
       timeout: 30000
     });
 
-    const offers = response.data?.offers || [];
-    const matchingOffer = offers.find(offer => offer.sku === sku);
+    const matchingOffer = (response.data?.offers || [])[0];
 
     if (matchingOffer) {
       return {
         found: true,
         offerId: matchingOffer.offerId,
-        listingId: matchingOffer.listingId || null,
+        listingId: matchingOffer.listing?.listingId || matchingOffer.listingId || null,
         status: matchingOffer.status,
         currentPrice: matchingOffer.pricingSummary?.price?.value,
         currentQuantity: matchingOffer.availableQuantity
@@ -3208,9 +3603,30 @@ async function publishToEbay(productData, overrides = {}) {
     const resolvedOverrides = typeof overrides === 'string'
       ? { environment: overrides }
       : (overrides || {});
+
+    // Strip our own "Strapey" branding and source-site brand keywords ("Shard",
+    // "Shard Blade", etc.) from the title before it ever reaches eBay - every
+    // publish/sync path (manual publish, bulk publish, and the eBay
+    // reconciliation sync) funnels through this function, so cleaning it here
+    // once covers all of them. Mutate the caller's object in place (rather than
+    // only the clone below) so callers that persist `productData`/`allData`
+    // after a successful publish save the cleaned title too.
+    if (productData && typeof productData.title === 'string') {
+      const cleanedTitle = optimizeTextForSeo(productData.title, 'title');
+      if (cleanedTitle && cleanedTitle !== productData.title) {
+        productData.title = cleanedTitle;
+      }
+    }
+
     const ebayConfig = getEbayRuntimeConfig(resolvedOverrides);
     const normalizedProductData = forceNewConditionDefaults(productData || {});
-    const sku = normalizedProductData.customLabel || normalizedProductData.sku || 'UNKNOWN';
+    const adminSku = normalizedProductData.customLabel || normalizedProductData.sku || 'UNKNOWN';
+    // eBay's Inventory API keys an inventory item/offer by the SKU it was first
+    // published under and provides no way to rename it in place. If this product
+    // has already been published, ebaySku pins every eBay call to that original
+    // value so renaming the local admin SKU later can't make us create a
+    // conflicting duplicate listing or drop out of eBay sync matching.
+    const sku = normalizedProductData.ebaySku || adminSku;
 
     // eBay's Inventory API rejects an empty description with a 400 (errorId 25718).
     // Some older/re-imported records were saved with description: '' (e.g. from a
@@ -3454,7 +3870,7 @@ async function publishToEbay(productData, overrides = {}) {
           },
           product: {
             title: String(normalizedProductData.title || '').substring(0, 80),
-            description: String(normalizedProductData.description || '').substring(0, 4000),
+            description: truncateHtmlSafely(String(normalizedProductData.description || ''), 4000),
             imageUrls,
             aspects
           }
@@ -3576,6 +3992,9 @@ async function publishToEbay(productData, overrides = {}) {
         success: true,
         offerId: existingOffer.offerId,
         sku,
+        ebaySku: sku,
+        adminSku,
+        title: normalizedProductData.title,
         listingId: finalListingId,
         listingLink,
         status: existingOffer.status,
@@ -3615,7 +4034,7 @@ async function publishToEbay(productData, overrides = {}) {
       },
       product: {
         title: String(normalizedProductData.title || '').substring(0, 80),
-        description: String(normalizedProductData.description || '').substring(0, 4000),
+        description: truncateHtmlSafely(String(normalizedProductData.description || ''), 4000),
         imageUrls,
         aspects
       }
@@ -3689,7 +4108,7 @@ async function publishToEbay(productData, overrides = {}) {
       format: 'FIXED_PRICE',
       availableQuantity: quantity,
       categoryId: String(categoryId),
-      listingDescription: String(normalizedProductData.description || '').substring(0, 4000),
+      listingDescription: truncateHtmlSafely(String(normalizedProductData.description || ''), 4000),
       merchantLocationKey,
       pricingSummary: {
         price: {
@@ -3801,6 +4220,9 @@ async function publishToEbay(productData, overrides = {}) {
       success: true,
       offerId,
       sku,
+      ebaySku: sku,
+      adminSku,
+      title: normalizedProductData.title,
       listingId,
       listingLink,
       status: 'PUBLISHED',
@@ -3847,6 +4269,111 @@ async function publishToEbay(productData, overrides = {}) {
   }
 }
 
+// eBay's Inventory API has no rename operation - a SKU is the immutable
+// primary key of its inventory item. The only way to make eBay display an
+// updated SKU/Custom Label for a listing is to withdraw the listing published
+// under the old SKU and publish a fresh one under the new SKU. This is
+// destructive: the listing gets a NEW item number and loses its watchers/
+// view/sales history for that item number, plus there's a brief window where
+// the item isn't live between withdraw and re-publish. Only call this when
+// the caller has explicitly asked to sync the SKU (never as a side effect of
+// a routine publish/update).
+async function syncProductSkuToEbay(productData, overrides = {}) {
+  const logger = createLogger('SkuRelist');
+
+  const oldSku = productData.ebaySku || productData.customLabel || productData.sku || '';
+  const newSku = productData.customLabel || productData.sku || '';
+
+  if (!oldSku || !newSku || oldSku === newSku) {
+    return {
+      success: true,
+      action: 'NOOP',
+      message: 'Local SKU already matches the SKU registered with eBay - nothing to relist.',
+      oldSku,
+      newSku
+    };
+  }
+
+  const ebayEnvironment = resolveEbayEnvironment(overrides);
+  const token = await getEbayAccessToken(overrides);
+  const { apiBase } = getEbayBaseUrls({ environment: ebayEnvironment });
+
+  logger.info('Starting SKU relist', { oldSku, newSku });
+
+  const existingOffer = await fetchOfferForSku(oldSku, token, apiBase);
+  const oldListingId = existingOffer?.listingId || null;
+
+  if (existingOffer && existingOffer.status === 'PUBLISHED') {
+    logger.info('Withdrawing listing published under old SKU', { offerId: existingOffer.offerId, oldSku, oldListingId });
+    await axios.post(`${apiBase}/sell/inventory/v1/offer/${encodeURIComponent(existingOffer.offerId)}/withdraw`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Content-Language': 'en-US'
+      },
+      timeout: 30000
+    });
+    logger.success('Old listing withdrawn', { offerId: existingOffer.offerId, oldListingId });
+  } else {
+    logger.warn('No live eBay offer found under old SKU - proceeding straight to publishing under new SKU', { oldSku, offerStatus: existingOffer?.status || 'NOT_FOUND' });
+  }
+
+  // Strip ebaySku so publishToEbay's `sku` resolution falls through to the
+  // new admin SKU and takes the "create new listing" path instead of trying
+  // (and failing) to find an offer under the now-withdrawn old SKU.
+  const relistProductData = { ...productData, ebaySku: undefined };
+
+  let publishResult;
+  try {
+    publishResult = await publishToEbay(relistProductData, overrides);
+  } catch (publishError) {
+    publishResult = { success: false, message: publishError.message };
+  }
+
+  if (!publishResult.success) {
+    logger.error('New listing failed after withdrawing old one - attempting rollback', {
+      oldSku, oldListingId, offerId: existingOffer?.offerId, error: publishResult.message
+    });
+
+    if (existingOffer?.offerId && existingOffer.status === 'PUBLISHED') {
+      let rollbackError = null;
+      try {
+        await axios.post(`${apiBase}/sell/inventory/v1/offer/${encodeURIComponent(existingOffer.offerId)}/publish`, {}, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US'
+          },
+          timeout: 30000
+        });
+      } catch (err) {
+        rollbackError = err;
+      }
+
+      if (!rollbackError) {
+        logger.warn('Rollback succeeded - original listing restored under old SKU', { oldSku, oldListingId });
+        throw new Error(`New listing under SKU "${newSku}" failed to publish (${publishResult.message}). Rolled back: the original listing is restored under SKU "${oldSku}" (${oldListingId}). No live listing was lost, but the SKU sync did not complete - retry later.`);
+      }
+
+      throw new Error(`CRITICAL: Withdrew listing ${oldListingId} (SKU "${oldSku}") but failed to publish the new listing under "${newSku}" (${publishResult.message}), AND the rollback re-publish also failed (${rollbackError.message}). This item may now be OFFLINE on eBay - manual intervention required.`);
+    }
+
+    throw new Error(`New listing under SKU "${newSku}" failed to publish: ${publishResult.message}`);
+  }
+
+  logger.success('SKU relist completed', { oldSku, newSku, oldListingId, newListingId: publishResult.listingId });
+
+  return {
+    ...publishResult,
+    action: 'RELISTED',
+    oldSku,
+    newSku,
+    oldListingId,
+    newListingId: publishResult.listingId,
+    logs: logger.getLogs()
+  };
+}
+
 app.post('/api/ebay-upload-images', async (req, res) => {
   try {
     const imageUrls = Array.isArray(req.body?.imageUrls) ? req.body.imageUrls.filter(Boolean) : [];
@@ -3873,6 +4400,94 @@ app.post('/api/ebay-upload-images', async (req, res) => {
       success: false,
       error: error.message || 'Failed to upload images to eBay EPS'
     });
+  }
+});
+
+// Read-only: full list of every SKU eBay currently has an inventory item for.
+// Used to audit for leftover duplicate listings (old-format sku still
+// registered alongside its renamed replacement).
+app.get('/api/ebay-all-skus', async (req, res) => {
+  try {
+    const token = await getEbayAccessToken({ environment: 'production' });
+    const { apiBase } = getEbayBaseUrls({ environment: 'production' });
+    const skus = await fetchAllEbayInventorySkus(token, apiBase, {});
+    return res.json({ success: true, count: skus.size, skus: Array.from(skus) });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.response?.data?.errors?.[0]?.message || error.message });
+  }
+});
+
+// Read-only: report whatever eBay actually has registered for a given SKU
+// right now (offer status, listing id) - for verifying local data.json
+// against ground truth rather than trusting our own cached fields.
+app.get('/api/ebay-offer-status/:sku', async (req, res) => {
+  try {
+    const sku = req.params.sku;
+    const token = await getEbayAccessToken({ environment: 'production' });
+    const { apiBase } = getEbayBaseUrls({ environment: 'production' });
+    const offer = await fetchOfferForSku(sku, token, apiBase);
+    return res.json({ success: true, sku, found: !!offer, offer: offer || null });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.response?.data?.errors?.[0]?.message || error.message });
+  }
+});
+
+// Utility: withdraw a currently-published offer by SKU (takes the listing
+// off eBay but keeps the offer/inventory item, unlike delete). Used to clean
+// up leftover duplicate live listings under an old SKU once the correct one
+// under the new SKU is confirmed live.
+app.post('/api/ebay-withdraw-offer/:sku', async (req, res) => {
+  try {
+    const sku = req.params.sku;
+    const token = await getEbayAccessToken({ environment: 'production' });
+    const { apiBase } = getEbayBaseUrls({ environment: 'production' });
+    const offer = await fetchOfferForSku(sku, token, apiBase);
+    if (!offer) {
+      return res.json({ success: true, message: `No offer found for SKU ${sku}.` });
+    }
+    if (offer.status !== 'PUBLISHED') {
+      return res.json({ success: true, message: `Offer for SKU ${sku} is already ${offer.status}, nothing to withdraw.` });
+    }
+    await axios.post(`${apiBase}/sell/inventory/v1/offer/${encodeURIComponent(offer.offerId)}/withdraw`, {}, {
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Content-Language': 'en-US' },
+      timeout: 30000
+    });
+    return res.json({ success: true, message: `Withdrew listing ${offer.listingId} (offer ${offer.offerId}) for SKU ${sku}.`, listingId: offer.listingId, offerId: offer.offerId });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.response?.data?.errors?.[0]?.message || error.message });
+  }
+});
+
+// Utility: delete a stale/unpublished offer + its inventory item by SKU.
+// Used to clear out orphaned drafts left behind by earlier failed publish
+// attempts (created but never went live) that would otherwise block a fresh
+// create-and-publish under that same SKU.
+app.delete('/api/ebay-orphan-offer/:sku', async (req, res) => {
+  try {
+    const sku = req.params.sku;
+    const token = await getEbayAccessToken({ environment: 'production' });
+    const { apiBase } = getEbayBaseUrls({ environment: 'production' });
+
+    const offer = await fetchOfferForSku(sku, token, apiBase);
+    if (!offer) {
+      return res.json({ success: true, message: `No offer found for SKU ${sku}.` });
+    }
+    if (offer.status === 'PUBLISHED') {
+      return res.status(400).json({ success: false, error: `Offer for SKU ${sku} is PUBLISHED/live - refusing to delete. Withdraw it first if you really want this.` });
+    }
+
+    await axios.delete(`${apiBase}/sell/inventory/v1/offer/${encodeURIComponent(offer.offerId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 30000
+    });
+    await axios.delete(`${apiBase}/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 30000
+    });
+
+    return res.json({ success: true, message: `Deleted unpublished offer ${offer.offerId} and inventory item for SKU ${sku}.` });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.response?.data?.errors?.[0]?.message || error.message });
   }
 });
 
@@ -6274,6 +6889,7 @@ app.post('/publish-ebay', async (req, res) => {
     productData.publishedLink = publishResult.listingLink;
     productData.listingId = publishResult.listingId;
     productData.sku = publishResult.sku;
+    if (!productData.ebaySku) productData.ebaySku = publishResult.ebaySku || publishResult.sku;
     productData.offerId = publishResult.offerId;
     productData.publishAction = publishResult.action || 'CREATED';  // Track action: CREATED, UPDATED, or UNCHANGED
     productData.publishedDate = new Date().toISOString();
@@ -7844,11 +8460,36 @@ async function scrapeEbayProduct(url, itemNumber = '', sku = '', scrapeContext =
           return /desc/i.test(frameUrl) || /desc/i.test(frameName);
         });
         if (descriptionFrame) {
-          const iframeText = await descriptionFrame.evaluate(() => (document.body ? document.body.innerText : ''));
+          // Grab the seller's rich-text description as HTML (not just innerText) so
+          // formatting - bold, lists, headings, images, tables - survives into our
+          // listing instead of being flattened to plain text. Dangerous elements
+          // (script/style/iframe/forms/event-handler attributes) are stripped inside
+          // the page first using real DOM APIs, then again on the Node side via
+          // sanitizeDescriptionHtml as defense in depth before this ever gets stored.
+          const { html: iframeHtml, text: iframeText } = await descriptionFrame.evaluate(() => {
+            if (!document.body) return { html: '', text: '' };
+            const clone = document.body.cloneNode(true);
+            const disallowedTags = ['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base', 'form', 'input', 'button', 'textarea', 'select', 'noscript'];
+            disallowedTags.forEach((tag) => {
+              clone.querySelectorAll(tag).forEach((el) => el.remove());
+            });
+            clone.querySelectorAll('*').forEach((el) => {
+              Array.from(el.attributes).forEach((attr) => {
+                const name = attr.name.toLowerCase();
+                const value = attr.value || '';
+                if (name.startsWith('on') || ((name === 'href' || name === 'src') && /^\s*(javascript|vbscript):/i.test(value))) {
+                  el.removeAttribute(attr.name);
+                }
+              });
+            });
+            return { html: clone.innerHTML, text: clone.innerText || clone.textContent || '' };
+          });
           const cleanedIframeText = String(iframeText || '').replace(/\s+/g, ' ').trim();
-          if (cleanedIframeText.length > (extractedData.description || '').length) {
-            console.log(`Found richer description in iframe (${cleanedIframeText.length} chars vs ${(extractedData.description || '').length} from main page); using iframe content`);
-            extractedData.description = cleanedIframeText;
+          const existingPlainLength = String(extractedData.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().length;
+          if (cleanedIframeText.length > existingPlainLength) {
+            const sanitizedHtml = sanitizeDescriptionHtml(String(iframeHtml || '').trim());
+            console.log(`Found richer description in iframe (${cleanedIframeText.length} chars vs ${existingPlainLength} from main page); using iframe content${sanitizedHtml ? ' (HTML preserved)' : ' (plain text)'}`);
+            extractedData.description = sanitizedHtml || cleanedIframeText;
           }
         }
       } catch (e) {
@@ -9238,6 +9879,7 @@ async function processBulkUploadJob(jobId, productsToPublish, environment, dryRu
               // Update data.json with listing info
               const allData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
               if (allData[link]) {
+                if (result.title) allData[link].title = result.title;
                 if (isProduction) {
                   allData[link].productionListingId = result.listingId;
                   allData[link].publishedToProduction = true;
@@ -9247,6 +9889,7 @@ async function processBulkUploadJob(jobId, productsToPublish, environment, dryRu
                   allData[link].publishedToSandbox = true;
                   allData[link].lastPublishedToSandboxAt = new Date().toISOString();
                 }
+                if (!allData[link].ebaySku) allData[link].ebaySku = result.ebaySku || result.sku;
                 fs.writeFileSync(dataFile, JSON.stringify(allData, null, 2));
               }
               
@@ -9384,7 +10027,7 @@ app.post('/api/products/sync-from-ebay', async (req, res) => {
     // both locally and on eBay - GET /offer requires a sku param per call, so we
     // avoid one round-trip per eBay SKU that has no local counterpart.
     const localSkuEntries = Object.entries(allData)
-      .map(([key, product]) => ({ key, product, sku: product.sku || product.customLabel }))
+      .map(([key, product]) => ({ key, product, sku: product.ebaySku || product.sku || product.customLabel }))
       .filter(({ sku }) => sku && ebayInventorySkus.has(sku));
 
     const ebayOffersBySku = new Map();
@@ -9408,7 +10051,7 @@ app.post('/api/products/sync-from-ebay', async (req, res) => {
     let unchangedCount = 0;
 
     Object.entries(allData).forEach(([key, product]) => {
-      const sku = product.sku || product.customLabel;
+      const sku = product.ebaySku || product.sku || product.customLabel;
       if (!sku) return;
       const offer = ebayOffersBySku.get(sku);
       if (!offer) return;
@@ -9470,10 +10113,11 @@ app.post('/api/products/sync-from-ebay', async (req, res) => {
         const currentData = readDataFileOrThrow(dataFile);
         const initialCount = Object.keys(currentData).length;
 
-        toMarkPublished.forEach(({ key, offer }) => {
+        toMarkPublished.forEach(({ key, sku, offer }) => {
           if (!currentData[key]) return;
           currentData[key].publishStatus = 'Published';
           currentData[key].status = 'Published';
+          if (!currentData[key].ebaySku) currentData[key].ebaySku = sku;
           currentData[key].productionListingId = offer.listingId;
           currentData[key].productionLink = offer.listingId
             ? `https://www.ebay.com/itm/${offer.listingId}`
@@ -9621,6 +10265,7 @@ async function processEbaySyncPushJob(jobId, itemsToUpdate, environment, logger)
           await withDataFileLock(async () => {
             const currentData = readDataFileOrThrow(dataFile);
             if (currentData[key]) {
+              if (result.title) currentData[key].title = result.title;
               currentData[key].productionListingId = result.listingId || currentData[key].productionListingId;
               currentData[key].productionLink = result.listingLink || currentData[key].productionLink;
               currentData[key].publishedToProduction = true;
@@ -9629,6 +10274,7 @@ async function processEbaySyncPushJob(jobId, itemsToUpdate, environment, logger)
               currentData[key].lastPublishEnvironment = 'production';
               currentData[key].lastPublishedToProdAt = new Date().toISOString();
               currentData[key].lastSyncedFromEbay = new Date().toISOString();
+              if (!currentData[key].ebaySku) currentData[key].ebaySku = result.ebaySku || result.sku;
               atomicWriteJsonSync(dataFile, currentData, { spaces: 2 });
             }
           });

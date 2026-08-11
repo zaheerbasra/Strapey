@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(grep -n \"const dataFile = path.join\\('data', 'data.json'\\);\\\\|let allData = {};\\\\|const existing = allData\\\\[url\\\\];\" server.js)"
+    ]
+  }
+}

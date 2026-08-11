@@ -24,7 +24,41 @@ try {
 }
 
 /**
- * Generate branded product description
+ * Minimal HTML escaper for interpolating plain-text values into the
+ * description template below (item specifics, plain-text source copy).
+ */
+function escapeHtml(text) {
+  return String(text == null ? '' : text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Wrap plain-text source copy into paragraph markup so it renders with the
+ * same line/paragraph breaks the seller originally wrote, instead of eBay
+ * collapsing it into one run-on block of text.
+ */
+function textToHtmlParagraphs(text) {
+  const paragraphs = String(text || '')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) return '';
+  return paragraphs
+    .map((p) => `<p style="margin:0 0 14px;">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+/**
+ * Generate a branded, HTML-formatted product description. eBay listing
+ * descriptions render as HTML, so this outputs a self-contained block with
+ * inline styles (external stylesheets never reach the listing page) instead
+ * of plain text - the same content that used to rely on unicode symbols
+ * (✦, ▸, ───) for "formatting" now gets real visual structure that survives
+ * both the admin preview and the published eBay listing.
  */
 function generateBrandedDescription(product, options = {}) {
   const {
@@ -38,63 +72,68 @@ function generateBrandedDescription(product, options = {}) {
 
   const category = brandConfig.productCategories?.[productGroup] || {};
   const categoryTagline = category.tagline || '';
-  
-  let content = [];
-  
-  // Brand header
+
+  // Descriptions may already be HTML (manually edited by an admin, or
+  // captured from the seller's original eBay listing) - if so, use it as-is
+  // (it's sanitized before it ever reaches this function); otherwise wrap
+  // plain text into paragraphs so it still displays with real structure.
+  const looksLikeHtml = /<[a-z][\s\S]*>/i.test(String(description || ''));
+  const bodyHtml = looksLikeHtml ? description : textToHtmlParagraphs(description);
+
+  const sections = [];
+
   if (includeBrand) {
-    content.push(`✦ ${brandConfig.name.toUpperCase()} ✦`);
-    content.push(`${brandConfig.tagline}\n`);
+    sections.push(`
+      <div style="text-align:center;padding:20px 16px;background:linear-gradient(135deg,#1a4d2e 0%,#2d5016 100%);border-radius:10px 10px 0 0;">
+        <h1 style="margin:0;color:#d4af37;font-size:26px;letter-spacing:3px;">${escapeHtml(brandConfig.name.toUpperCase())}</h1>
+        <p style="margin:6px 0 0;color:#f5f5dc;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;">${escapeHtml(brandConfig.tagline)}</p>
+      </div>`);
   }
-  
-  // Category-specific intro
+
   if (categoryTagline) {
-    content.push(`${categoryTagline}\n`);
+    sections.push(`<p style="margin:16px 0 0;text-align:center;font-style:italic;color:#555;font-size:15px;">${escapeHtml(categoryTagline)}</p>`);
   }
-  
-  // Main description
-  content.push(description);
-  
-  // Specifications section
+
+  sections.push(`<div style="margin:20px 0;color:#333;font-size:15px;line-height:1.7;">${bodyHtml}</div>`);
+
   if (includeSpecs && itemSpecifics && Object.keys(itemSpecifics).length > 0) {
-    content.push('\n───────────────────────');
-    content.push('🗡️ SPECIFICATIONS\n');
-    
     const specs = [];
-    if (itemSpecifics.Brand) specs.push(`▸ Brand: ${itemSpecifics.Brand}`);
-    if (itemSpecifics['Blade Material']) specs.push(`▸ Blade Material: ${itemSpecifics['Blade Material']}`);
-    if (itemSpecifics['Blade Type']) specs.push(`▸ Blade Type: ${itemSpecifics['Blade Type']}`);
-    if (itemSpecifics['Blade Length']) specs.push(`▸ Blade Length: ${itemSpecifics['Blade Length']}`);
-    if (itemSpecifics['Overall Length']) specs.push(`▸ Overall Length: ${itemSpecifics['Overall Length']}`);
-    if (itemSpecifics['Handle Material']) specs.push(`▸ Handle Material: ${itemSpecifics['Handle Material']}`);
-    if (itemSpecifics.Color) specs.push(`▸ Color: ${itemSpecifics.Color}`);
-    if (itemSpecifics.Handmade) specs.push(`▸ Handmade: ${itemSpecifics.Handmade}`);
-    if (itemSpecifics['Country/Region of Manufacture']) specs.push(`▸ Made in: ${itemSpecifics['Country/Region of Manufacture']}`);
-    
-    // Always include condition
-    specs.push('▸ Condition: New');
-    
-    content.push(specs.join('\n'));
+    if (itemSpecifics.Brand) specs.push(['Brand', itemSpecifics.Brand]);
+    if (itemSpecifics['Blade Material']) specs.push(['Blade Material', itemSpecifics['Blade Material']]);
+    if (itemSpecifics['Blade Type']) specs.push(['Blade Type', itemSpecifics['Blade Type']]);
+    if (itemSpecifics['Blade Length']) specs.push(['Blade Length', itemSpecifics['Blade Length']]);
+    if (itemSpecifics['Overall Length']) specs.push(['Overall Length', itemSpecifics['Overall Length']]);
+    if (itemSpecifics['Handle Material']) specs.push(['Handle Material', itemSpecifics['Handle Material']]);
+    if (itemSpecifics.Color) specs.push(['Color', itemSpecifics.Color]);
+    if (itemSpecifics.Handmade) specs.push(['Handmade', itemSpecifics.Handmade]);
+    if (itemSpecifics['Country/Region of Manufacture']) specs.push(['Made In', itemSpecifics['Country/Region of Manufacture']]);
+    specs.push(['Condition', 'New']); // Business rule: all outbound listings are published as New condition.
+
+    sections.push(`
+      <div style="background:#f5f5dc;border:1px solid #d4af37;border-radius:8px;padding:18px 20px;margin-bottom:20px;">
+        <h3 style="margin:0 0 12px;color:#1a4d2e;font-size:17px;">🗡️ Specifications</h3>
+        <ul style="margin:0;padding-left:20px;color:#333;font-size:14px;">
+          ${specs.map(([label, value]) => `<li style="margin-bottom:6px;"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`).join('')}
+        </ul>
+      </div>`);
   }
-  
-  // Brand promise
-  content.push('\n───────────────────────');
-  content.push(`⚡ THE ${brandConfig.name.toUpperCase()} PROMISE\n`);
-  content.push('✓ Hand-forged excellence');
-  content.push('✓ Premium materials');
-  content.push('✓ Built to last a lifetime');
-  content.push('✓ Authentic craftsmanship');
-  
-  // Category-specific benefits
+
+  const benefits = ['Hand-forged excellence', 'Premium materials', 'Built to last a lifetime', 'Authentic craftsmanship'];
   if (productGroup === 'hunting-knives') {
-    content.push('✓ Field-tested durability');
-    content.push('✓ Wilderness-ready performance');
+    benefits.push('Field-tested durability', 'Wilderness-ready performance');
   } else if (productGroup === 'kitchen-chef-sets') {
-    content.push('✓ Razor-sharp precision');
-    content.push('✓ Professional-grade quality');
+    benefits.push('Razor-sharp precision', 'Professional-grade quality');
   }
-  
-  return content.join('\n');
+
+  sections.push(`
+    <div style="background:#1a4d2e;border-radius:8px;padding:18px 20px;">
+      <h3 style="margin:0 0 12px;color:#d4af37;font-size:17px;">⚡ The ${escapeHtml(brandConfig.name)} Promise</h3>
+      <ul style="margin:0;padding-left:20px;color:#f5f5dc;font-size:14px;">
+        ${benefits.map((b) => `<li style="margin-bottom:6px;">${escapeHtml(b)}</li>`).join('')}
+      </ul>
+    </div>`);
+
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:800px;margin:0 auto;">${sections.join('')}</div>`;
 }
 
 /**

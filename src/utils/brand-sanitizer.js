@@ -81,6 +81,58 @@ function stripTrademarkSymbols(text) {
 }
 
 /**
+ * Tags that must never survive into a stored/displayed description - they can
+ * execute code (script, event handlers via inline attributes) or pull in
+ * external resources we don't control (iframe/object/embed/form/link/meta).
+ * Descriptions can come from admin edits or scraped third-party eBay listings,
+ * and are later rendered with innerHTML in the admin UI, so untrusted markup
+ * has to be stripped before it's ever saved.
+ */
+const HTML_DISALLOWED_TAGS = [
+  'script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base',
+  'form', 'input', 'button', 'textarea', 'select', 'noscript', 'svg', 'math'
+];
+
+/**
+ * Strip dangerous tags/attributes from an HTML description while preserving
+ * ordinary formatting markup (bold/italic/lists/headings/tables/images/links/
+ * inline styles). This is a pragmatic denylist-based pass (no HTML parser
+ * dependency), not a full HTML sanitizer - good enough for content edited by
+ * trusted admin users or scraped from eBay, rendered only in our own admin UI.
+ */
+function sanitizeDescriptionHtml(html) {
+  if (!html || typeof html !== 'string') {
+    return html || '';
+  }
+
+  let sanitized = html;
+
+  // Remove disallowed tags together with their contents (script/style bodies
+  // are never safe to keep even as text).
+  HTML_DISALLOWED_TAGS.forEach((tag) => {
+    const pairPattern = new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}\\s*>`, 'gi');
+    sanitized = sanitized.replace(pairPattern, '');
+    const selfClosingPattern = new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi');
+    sanitized = sanitized.replace(selfClosingPattern, '');
+  });
+
+  // Strip HTML comments (can hide markup or be used for legacy conditional-
+  // comment based exploits).
+  sanitized = sanitized.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Strip inline event-handler attributes (onclick=, onerror=, onload=, ...).
+  sanitized = sanitized.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+
+  // Neutralize javascript:/vbscript: URIs on href/src.
+  sanitized = sanitized.replace(
+    /\s(href|src)\s*=\s*("|')\s*(javascript|vbscript):[^"']*\2/gi,
+    ''
+  );
+
+  return sanitized.trim();
+}
+
+/**
  * Sanitize product title - remove competitor brands only. Does not force-add
  * or remove "Strapey" - that's a content decision left to the caller/editor,
  * not something this function should silently override on every save.
@@ -154,7 +206,7 @@ function sanitizeProduct(product) {
 
   // Sanitize description
   if (sanitized.description) {
-    sanitized.description = sanitizeDescription(sanitized.description);
+    sanitized.description = sanitizeDescriptionHtml(sanitizeDescription(sanitized.description));
   }
 
   // Sanitize item specifics
@@ -183,6 +235,7 @@ module.exports = {
   stripTrademarkSymbols,
   sanitizeTitle,
   sanitizeDescription,
+  sanitizeDescriptionHtml,
   sanitizeItemSpecifics,
   sanitizeProduct,
   BRANDS_TO_REMOVE

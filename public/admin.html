@@ -549,6 +549,141 @@
       border-top: 1px solid var(--border-color);
     }
 
+    /* Wider modal variant used by the Edit Product screen so there's room
+       for the image preview + description editor alongside the form fields. */
+    .modal-content-wide {
+      max-width: 960px;
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+
+    /* Inline row editing (products table) - eBay-style hover-to-reveal
+       pencil icon that turns a single cell into an editable input in place. */
+    .inline-edit-cell {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+    }
+
+    .inline-edit-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .inline-edit-btn {
+      opacity: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity 0.15s, background-color 0.15s;
+      line-height: 1;
+    }
+
+    .inline-edit-cell:hover .inline-edit-btn {
+      opacity: 1;
+    }
+
+    .inline-edit-btn:hover {
+      background-color: var(--bg-tertiary);
+    }
+
+    .inline-edit-form {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+    }
+
+    .inline-edit-form input,
+    .inline-edit-form select {
+      flex: 1;
+      min-width: 0;
+      padding: 4px 6px;
+      font-size: 13px;
+      border: 1px solid var(--color-primary);
+      border-radius: 4px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+    }
+
+    .inline-edit-form .inline-save-btn,
+    .inline-edit-form .inline-cancel-btn {
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 13px;
+      background: transparent;
+    }
+
+    .inline-edit-form .inline-save-btn:hover {
+      background-color: rgba(34, 197, 94, 0.15);
+    }
+
+    .inline-edit-form .inline-cancel-btn:hover {
+      background-color: rgba(239, 68, 68, 0.15);
+    }
+
+    /* Rich text (HTML) description editor */
+    .rte-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 6px;
+      border: 1px solid var(--border-color);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      background: var(--bg-tertiary);
+    }
+
+    .rte-toolbar button {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-primary);
+      border-radius: 4px;
+      padding: 5px 9px;
+      font-size: 13px;
+      cursor: pointer;
+      min-width: 30px;
+    }
+
+    .rte-toolbar button:hover {
+      background: var(--bg-primary);
+      border-color: var(--border-color);
+    }
+
+    .rte-editor {
+      min-height: 220px;
+      max-height: 420px;
+      overflow-y: auto;
+      padding: 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 0 0 6px 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .rte-editor:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+
+    .rte-editor img {
+      max-width: 100%;
+    }
+
+    .rte-editor:empty:before {
+      content: attr(data-placeholder);
+      color: var(--text-secondary);
+    }
+
     /* Alert */
     .alert {
       padding: 12px 16px;
@@ -1115,7 +1250,7 @@
           <div style="display: flex; gap: 16px; flex-wrap: wrap;">
             <div>
               <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Source</label>
-              <select id="order-source-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+              <select id="order-source-filter" onchange="resetOrdersPageAndLoad()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
                 <option value="ebay">eBay</option>
                 <option value="etsy" disabled>Etsy (Coming Soon)</option>
                 <option value="website" disabled>Website (Coming Soon)</option>
@@ -1123,26 +1258,25 @@
             </div>
             <div>
               <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Status</label>
-              <select id="order-status-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+              <select id="order-status-filter" onchange="resetOrdersPageAndLoad()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
                 <option value="">All Statuses</option>
-                <option value="NOT_STARTED">Not Started</option>
+                <option value="NOT_STARTED" selected>Not Started</option>
                 <option value="IN_PROGRESS">In Progress</option>
                 <option value="FULFILLED">Fulfilled</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
             <div>
-              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Limit</label>
-              <select id="order-limit-filter" onchange="loadOrders()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
+              <label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--text-secondary);">Page size</label>
+              <select id="order-limit-filter" onchange="resetOrdersPageAndLoad()" style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
                 <option value="10" selected>10</option>
                 <option value="50">50</option>
                 <option value="100">100</option>
-                <option value="500">500</option>
               </select>
             </div>
           </div>
           <div style="margin-top: 12px; font-size: 12px; color: var(--text-tertiary);" id="orders-cache-info">
-            
+
           </div>
         </div>
 
@@ -1173,17 +1307,29 @@
                   <th class="sortable" data-sort="buyerName" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Buyer Name</th>
                   <th class="sortable" data-sort="sku" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">SKU</th>
                   <th class="sortable" data-sort="qty" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Qty</th>
-                  <th class="sortable" data-sort="orderEarnings" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Order Earnings</th>
-                  <th class="sortable" data-sort="ebayCharges" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">eBay Charges</th>
                   <th class="sortable" data-sort="orderTotal" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Total</th>
+                  <th class="sortable" data-sort="orderEarnings" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);" title="Understated until shipping label cost can be sourced - see Shipping Label column">Order Earnings&nbsp;⚠️</th>
+                  <th class="sortable" data-sort="ebayCharges" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);" title="Understated until shipping label cost can be sourced - see Shipping Label column">Total eBay Charges&nbsp;⚠️</th>
+                  <th class="sortable" data-sort="salesTax" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Sales Tax</th>
+                  <th class="sortable" data-sort="transactionFee" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Transaction Fee</th>
+                  <th class="sortable" data-sort="adFee" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Ad Fee</th>
+                  <th class="sortable" data-sort="shippingLabelFee" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);" title="Not available via any eBay API when the label wasn't purchased through eBay's own shipping service">Shipping Label</th>
                   <th class="sortable" data-sort="status" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Status</th>
                   <th class="sortable" data-sort="payment" style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Payment</th>
+                  <th style="padding: 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary);">Actions</th>
                 </tr>
               </thead>
               <tbody id="orders-table-body">
-                
+
               </tbody>
             </table>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-top: 1px solid var(--border-color);">
+              <span id="orders-page-info" style="font-size: 12px; color: var(--text-secondary);"></span>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary" id="orders-prev-page" onclick="ordersPrevPage()" style="padding: 6px 12px;">← Prev</button>
+                <button class="btn btn-secondary" id="orders-next-page" onclick="ordersNextPage()" style="padding: 6px 12px;">Next →</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1563,10 +1709,17 @@
 
   <!-- Edit Product Modal -->
   <div class="modal" id="editProductModal">
-    <div class="modal-content">
+    <div class="modal-content modal-content-wide">
       <div class="modal-header">Edit Product</div>
       <form id="editProductForm" onsubmit="updateProduct(event)">
         <input type="hidden" id="editProductId">
+        <!-- Product Images -->
+        <div class="form-group">
+          <label>Images</label>
+          <div id="editProductImages" style="display: flex; gap: 8px; flex-wrap: wrap; padding: 8px; background: var(--bg-tertiary); border-radius: 8px; min-height: 136px; align-items: center;">
+            <span style="color: var(--text-secondary); font-size: 13px;">No images</span>
+          </div>
+        </div>
         <!-- SKU -->
         <div class="form-group">
           <label>SKU</label>
@@ -1583,7 +1736,21 @@
         <!-- Description -->
         <div class="form-group">
           <label>Description</label>
-          <textarea id="editProductDescription" rows="4" placeholder="Product description"></textarea>
+          <div class="rte-toolbar">
+            <button type="button" title="Bold" onclick="rteExec('bold')"><strong>B</strong></button>
+            <button type="button" title="Italic" onclick="rteExec('italic')"><em>I</em></button>
+            <button type="button" title="Underline" onclick="rteExec('underline')"><u>U</u></button>
+            <button type="button" title="Heading" onclick="rteExec('formatBlock', 'H3')">H3</button>
+            <button type="button" title="Paragraph" onclick="rteExec('formatBlock', 'P')">¶</button>
+            <button type="button" title="Bullet list" onclick="rteExec('insertUnorderedList')">• List</button>
+            <button type="button" title="Numbered list" onclick="rteExec('insertOrderedList')">1. List</button>
+            <button type="button" title="Insert link" onclick="rteInsertLink()">🔗</button>
+            <button type="button" title="Clear formatting" onclick="rteExec('removeFormat')">Clear</button>
+          </div>
+          <div id="editProductDescription" class="rte-editor" contenteditable="true" data-placeholder="Product description"></div>
+          <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+            Formatting here is preserved as HTML in the listing description on eBay.
+          </small>
         </div>
         <!-- Price -->
         <div class="form-group">
@@ -2185,6 +2352,15 @@
       showToast(`Connecting ${channel}...`, 'info');
     }
 
+    function escapeHtmlAttr(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // Load Products
     let allProducts = [];
     let filteredProducts = [];
@@ -2320,113 +2496,276 @@
       renderProducts();
     }
 
+    // Display value shown (in view mode) for an inline-editable products-table field.
+    // Canonical product groups the admin UI lets users choose between (must match
+    // the values normalizeProductGroup() in src/utils/product-grouping.js recognizes).
+    const PRODUCT_GROUPS_UI = [
+      ['hunting-knives', 'Hunting Knives'],
+      ['kitchen-chef-sets', 'Kitchen/Chef Sets'],
+      ['pistol-parts', 'Pistol Parts'],
+      ['other', 'Other']
+    ];
+
+    function groupBadgeClassFor(productGroup) {
+      return productGroup === 'pistol-parts'
+        ? 'badge-danger'
+        : productGroup === 'hunting-knives'
+          ? 'badge-info'
+          : productGroup === 'kitchen-chef-sets'
+            ? 'badge-primary'
+            : 'badge-warning';
+    }
+
+    function inlineFieldDisplay(product, field) {
+      switch (field) {
+        case 'sku': return product.sku || 'N/A';
+        case 'title': return product.title || 'Untitled';
+        case 'ebayCategory': return product.ebayCategory || product.category || '-';
+        case 'price': return typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
+        case 'inventory': return product.inventory ?? product.inventoryQuantity ?? product.availableQuantity ?? 0;
+        case 'productGroup': return product.productGroupLabel || String(product.productGroup || 'other');
+        default: return '';
+      }
+    }
+
+    // View-mode markup for one inline-editable cell: the value plus a
+    // hover-reveal pencil button (mirrors eBay's inline-edit pattern).
+    function inlineCellViewHtml(product, field) {
+      const productId = String(product.id || product.url || product.itemNumber);
+      const valueHtml = field === 'productGroup'
+        ? `<span class="badge ${groupBadgeClassFor(String(product.productGroup || 'other'))}">${escapeHtmlAttr(inlineFieldDisplay(product, field))}</span>`
+        : `<span class="inline-edit-value">${escapeHtmlAttr(inlineFieldDisplay(product, field))}</span>`;
+      return `
+        <div class="inline-edit-cell">
+          ${valueHtml}
+          <button type="button" class="inline-edit-btn" title="Edit" onclick="startInlineEdit('${productId.replace(/'/g, "\\'")}', '${field}')">✏️</button>
+        </div>
+      `;
+    }
+
+    // Switches one products-table cell into edit mode: an input/select plus
+    // save (✓) and cancel (✕) buttons, scoped to just that cell/field.
+    function startInlineEdit(productId, field) {
+      const product = allProducts.find(p => String(p.id || p.url || p.itemNumber) === String(productId));
+      if (!product) return;
+      const rowId = btoa(productId).replace(/=/g, '');
+      const cell = document.getElementById(`cell-${field}-${rowId}`);
+      if (!cell) return;
+
+      const inputId = `inline-input-${field}-${rowId}`;
+      let inputHtml;
+      if (field === 'ebayCategory') {
+        inputHtml = `<select id="${inputId}">${getEbayCategoryOptionsHtml(product.ebayCategoryId, product.ebayCategory)}</select>`;
+      } else if (field === 'price') {
+        inputHtml = `<input type="number" step="0.01" min="0" id="${inputId}" value="${escapeHtmlAttr(product.price ?? '')}">`;
+      } else if (field === 'inventory') {
+        const val = product.inventory ?? product.inventoryQuantity ?? product.availableQuantity ?? 0;
+        inputHtml = `<input type="number" min="0" id="${inputId}" value="${escapeHtmlAttr(val)}">`;
+      } else if (field === 'sku' || field === 'title') {
+        inputHtml = `<input type="text" id="${inputId}" value="${escapeHtmlAttr(product[field] || '')}">`;
+      } else if (field === 'productGroup') {
+        const currentGroup = String(product.productGroup || 'other');
+        inputHtml = `<select id="${inputId}">${PRODUCT_GROUPS_UI.map(([val, label]) => `<option value="${val}" ${val === currentGroup ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+      } else {
+        return;
+      }
+
+      const escapedId = productId.replace(/'/g, "\\'");
+      cell.innerHTML = `
+        <div class="inline-edit-form">
+          ${inputHtml}
+          <button type="button" class="inline-save-btn" title="Save" onclick="saveInlineEdit('${escapedId}', '${field}')">✓</button>
+          <button type="button" class="inline-cancel-btn" title="Cancel" onclick="cancelInlineEdit('${escapedId}', '${field}')">✕</button>
+        </div>
+      `;
+      const inputEl = document.getElementById(inputId);
+      if (inputEl) {
+        inputEl.focus();
+        if (inputEl.select) inputEl.select();
+      }
+    }
+
+    function cancelInlineEdit(productId, field) {
+      const product = allProducts.find(p => String(p.id || p.url || p.itemNumber) === String(productId));
+      if (!product) return;
+      const rowId = btoa(productId).replace(/=/g, '');
+      const cell = document.getElementById(`cell-${field}-${rowId}`);
+      if (cell) cell.innerHTML = inlineCellViewHtml(product, field);
+    }
+
+    async function saveInlineEdit(productId, field) {
+      const rowId = btoa(productId).replace(/=/g, '');
+      const inputEl = document.getElementById(`inline-input-${field}-${rowId}`);
+      if (!inputEl) return;
+
+      const body = {};
+      if (field === 'ebayCategory') {
+        const [ebayCategoryId, ebayCategory] = (inputEl.value || '').split('|||');
+        body.ebayCategoryId = ebayCategoryId || '';
+        body.ebayCategory = ebayCategory || '';
+      } else if (field === 'price') {
+        const val = parseFloat(inputEl.value);
+        if (isNaN(val) || val < 0) { showToast('Enter a valid price', 'error'); return; }
+        body.price = val;
+      } else if (field === 'inventory') {
+        const val = parseInt(inputEl.value, 10);
+        if (isNaN(val) || val < 0) { showToast('Enter a valid inventory quantity', 'error'); return; }
+        body.inventory = val;
+      } else if (field === 'sku') {
+        const val = inputEl.value.trim();
+        if (!val) { showToast('SKU cannot be empty', 'error'); return; }
+        body.sku = val;
+      } else if (field === 'title') {
+        const val = inputEl.value.trim();
+        if (!val) { showToast('Title cannot be empty', 'error'); return; }
+        body.title = val;
+      } else if (field === 'productGroup') {
+        body.productGroup = inputEl.value;
+      } else {
+        return;
+      }
+
+      try {
+        const response = await fetch(`http://localhost:3001/api/products/${encodeURIComponent(productId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!response.ok) {
+          let message = 'Failed to update product';
+          try {
+            const errData = await response.json();
+            if (errData && errData.error) message = errData.error;
+          } catch (_) {}
+          throw new Error(message);
+        }
+        const data = await response.json();
+        const updated = data.product || data;
+
+        const idx = allProducts.findIndex(p => String(p.id || p.url || p.itemNumber) === String(productId));
+        if (idx !== -1) {
+          const existing = allProducts[idx];
+          Object.assign(existing, {
+            sku: updated.sku ?? existing.sku,
+            title: updated.title ?? existing.title,
+            price: typeof updated.price === 'number' ? updated.price : existing.price,
+            inventory: updated.inventoryQuantity ?? existing.inventory,
+            ebayCategory: updated.ebayCategory ?? existing.ebayCategory,
+            ebayCategoryId: updated.ebayCategoryId ?? existing.ebayCategoryId,
+            productGroup: updated.productGroup ?? existing.productGroup,
+            productGroupLabel: updated.productGroupLabel ?? existing.productGroupLabel
+          });
+          // itemNumber-less products use their SKU as the row id - keep it in
+          // sync after a rename so this row's buttons don't go stale.
+          if (field === 'sku' && !updated.itemNumber) {
+            existing.id = updated.sku || existing.id;
+          }
+          const rowEl = document.getElementById(`product-row-${rowId}`);
+          if (rowEl) rowEl.outerHTML = productRowHtml(existing);
+        }
+        showToast('Product updated', 'success');
+      } catch (error) {
+        console.error('Error updating product field:', error);
+        showToast('Failed to update: ' + error.message, 'error');
+      }
+    }
+
+    function productRowHtml(product) {
+      const firstImage = product.imageSourceUrls && product.imageSourceUrls.length > 0 ? product.imageSourceUrls[0] : '';
+      const imageUrl = firstImage ? `http://localhost:3001${firstImage}` : '';
+      const isPublished = !!(
+        product.publishedToProduction ||
+        product.productionLink ||
+        product.productionListingId ||
+        product.publishedLink ||
+        product.sandboxListingId
+      );
+      const status = product.publishStatus || (isPublished ? 'Published' : 'Draft');
+      const statusClass = isPublished ? 'badge-success' : 'badge-warning';
+      const itemNumber = product.id || 'N/A';
+      const productId = String(product.id || product.url || product.itemNumber);
+      const rowId = btoa(productId).replace(/=/g, '');
+      const isSelected = selectedProducts.has(productId);
+
+      return `
+        <tr id="product-row-${rowId}" style="${isSelected ? 'background-color: #dbeafe;' : ''}">
+          <td style="text-align: center; width: 40px;">
+            <input type="checkbox" class="product-checkbox" data-product-id="${productId}" data-sku="${product.sku || 'N/A'}"
+              onchange="updateProductSelection()" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
+          </td>
+          <td>
+            ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 120px; height: 120px; object-fit: cover; border-radius: 6px;">` : '📦'}
+          </td>
+          <td><strong>${itemNumber}</strong></td>
+          <td id="cell-sku-${rowId}" style="max-width: 160px;">${inlineCellViewHtml(product, 'sku')}</td>
+          <td id="cell-title-${rowId}" style="max-width: 300px;">${inlineCellViewHtml(product, 'title')}</td>
+          <td id="cell-productGroup-${rowId}">${inlineCellViewHtml(product, 'productGroup')}</td>
+          <td style="font-size: 12px; color: #6b7280;">${product.ebayCategoryId || product.categoryId || '-'}</td>
+          <td id="cell-ebayCategory-${rowId}" style="font-size: 12px; color: #6b7280; max-width: 180px;" title="${product.ebayCategory || product.category || 'Not set'}">${inlineCellViewHtml(product, 'ebayCategory')}</td>
+          <td id="cell-price-${rowId}">${inlineCellViewHtml(product, 'price')}</td>
+          <td id="cell-inventory-${rowId}">${inlineCellViewHtml(product, 'inventory')}</td>
+          <td><span class="badge ${statusClass}">${status}</span></td>
+          <td>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; max-width: 400px;">
+              ${product.url ? `
+                <button class="btn btn-sm btn-secondary" onclick="window.open('${product.url}', '_blank')" title="View Original eBay Listing">
+                  🔗 eBay
+                </button>
+              ` : ''}
+              ${product.url ? `
+                <button class="btn btn-sm btn-secondary" onclick="viewScrapedData('${productId.replace(/'/g, "\\'")}')" title="View Scraped Data">
+                  📄 Data
+                </button>
+              ` : ''}
+              ${product.url ? `
+                <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="rescrapeProduct('${productId.replace(/'/g, "\\'")}')" title="Re-scrape and Enrich">
+                  🔄 Scrape
+                </button>
+              ` : ''}
+              ${product.publishedLink || product.sandboxListingId ? `
+                <button class="btn btn-sm" style="background: #10b981; color: white;" onclick="window.open('${product.publishedLink || `https://www.sandbox.ebay.com/itm/${product.sandboxListingId}`}', '_blank')" title="View on eBay Sandbox">
+                  📦 Sandbox
+                </button>
+              ` : ''}
+              ${product.productionLink || product.productionListingId ? `
+                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="window.open('${product.productionLink || `https://www.ebay.com/itm/${product.productionListingId}`}', '_blank')" title="View on eBay Production">
+                  🌐 Prod
+                </button>
+              ` : ''}
+              <button class="btn btn-sm" style="background: #8b5cf6; color: white;" onclick="openEditProductModal('${productId.replace(/'/g, "\\'")}')" title="Edit Product">
+                ✏️ Edit
+              </button>
+              <button class="btn btn-sm" style="background: #0ea5e9; color: white;" onclick="openProductActivityLog('${productId.replace(/'/g, "\\'")}', '${(product.title || '').replace(/'/g, "\\'")}' || 'Product')" title="View Activity Log">
+                📋 Activity
+              </button>
+              <button class="btn btn-sm btn-primary" onclick="publishProduct('${productId.replace(/'/g, "\\'")}')" title="Publish using active Stage/Prod mode">
+                📤 Active (${getActivePublishLabel()})
+              </button>
+              <button class="btn btn-sm" style="background: #6366f1; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'sandbox')" title="Force publish to Sandbox">
+                📦 Force Sandbox
+              </button>
+              <button class="btn btn-sm" style="background: #059669; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'production')" title="Force publish to Production">
+                🌐 Force Prod
+              </button>
+            </div>
+            <div id="status-${rowId}" style="display: none; margin-top: 8px; padding: 8px; border-radius: 4px; font-size: 12px;"></div>
+          </td>
+        </tr>
+      `;
+    }
+
     function renderProducts() {
       const tbody = document.getElementById('products-tbody');
       const table = document.getElementById('products-table');
-      const paginationControls = document.getElementById('pagination-controls');
-      
+
       const startIndex = (currentPage - 1) * itemsPerPage;
       const endIndex = startIndex + itemsPerPage;
       const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-      // Render products table
-      tbody.innerHTML = paginatedProducts.map(product => {
-        const firstImage = product.imageSourceUrls && product.imageSourceUrls.length > 0 ? product.imageSourceUrls[0] : '';
-        const imageUrl = firstImage ? `http://localhost:3001${firstImage}` : '';
-        const price = typeof product.price === 'number' ? `$${product.price.toFixed(2)}` : 'N/A';
-        const isPublished = !!(
-          product.publishedToProduction ||
-          product.productionLink ||
-          product.productionListingId ||
-          product.publishedLink ||
-          product.sandboxListingId
-        );
-        const status = product.publishStatus || (isPublished ? 'Published' : 'Draft');
-        const statusClass = isPublished ? 'badge-success' : 'badge-warning';
-        const productGroup = String(product.productGroup || 'other');
-        const productGroupLabel = product.productGroupLabel || productGroup;
-        const groupBadgeClass = productGroup === 'pistol-parts'
-          ? 'badge-danger'
-          : productGroup === 'hunting-knives'
-            ? 'badge-info'
-            : productGroup === 'kitchen-chef-sets'
-              ? 'badge-primary'
-              : 'badge-warning';
-        const itemNumber = product.id || 'N/A';
-        const productId = product.id || product.url || product.itemNumber;
-        const rowId = btoa(productId).replace(/=/g, '');
-        const sku = product.sku || 'N/A';
-        const isSelected = selectedProducts.has(productId);
-        
-        return `
-          <tr id="product-row-${rowId}" style="${isSelected ? 'background-color: #dbeafe;' : ''}">
-            <td style="text-align: center; width: 40px;">
-              <input type="checkbox" class="product-checkbox" data-product-id="${productId}" data-sku="${sku}" 
-                onchange="updateProductSelection()" ${isSelected ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;">
-            </td>
-            <td>
-              ${imageUrl ? `<img src="${imageUrl}" alt="" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">` : '📦'}
-            </td>
-            <td><strong>${itemNumber}</strong></td>
-            <td><strong>${sku}</strong></td>
-            <td style="max-width: 300px;">${product.title || 'Untitled'}</td>
-            <td><span class="badge ${groupBadgeClass}">${productGroupLabel}</span></td>
-            <td style="font-size: 12px; color: #6b7280;">${product.ebayCategoryId || product.categoryId || '-'}</td>
-            <td style="font-size: 12px; color: #6b7280; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${product.ebayCategory || product.category || 'Not set'}">${product.ebayCategory || product.category || '-'}</td>
-            <td>${price}</td>
-            <td>${product.inventory || product.inventoryQuantity || product.availableQuantity || 0}</td>
-            <td><span class="badge ${statusClass}">${status}</span></td>
-            <td>
-              <div style="display: flex; gap: 4px; flex-wrap: wrap; max-width: 400px;">
-                ${product.url ? `
-                  <button class="btn btn-sm btn-secondary" onclick="window.open('${product.url}', '_blank')" title="View Original eBay Listing">
-                    🔗 eBay
-                  </button>
-                ` : ''}
-                ${product.url ? `
-                  <button class="btn btn-sm btn-secondary" onclick="viewScrapedData('${productId.replace(/'/g, "\\'")}')" title="View Scraped Data">
-                    📄 Data
-                  </button>
-                ` : ''}
-                ${product.url ? `
-                  <button class="btn btn-sm" style="background: #f97316; color: white;" onclick="rescrapeProduct('${productId.replace(/'/g, "\\'")}')" title="Re-scrape and Enrich">
-                    🔄 Scrape
-                  </button>
-                ` : ''}
-                ${product.publishedLink || product.sandboxListingId ? `
-                  <button class="btn btn-sm" style="background: #10b981; color: white;" onclick="window.open('${product.publishedLink || `https://www.sandbox.ebay.com/itm/${product.sandboxListingId}`}', '_blank')" title="View on eBay Sandbox">
-                    📦 Sandbox
-                  </button>
-                ` : ''}
-                ${product.productionLink || product.productionListingId ? `
-                  <button class="btn btn-sm" style="background: #059669; color: white;" onclick="window.open('${product.productionLink || `https://www.ebay.com/itm/${product.productionListingId}`}', '_blank')" title="View on eBay Production">
-                    🌐 Prod
-                  </button>
-                ` : ''}
-                <button class="btn btn-sm" style="background: #8b5cf6; color: white;" onclick="openEditProductModal('${productId.replace(/'/g, "\\'")}')" title="Edit Product">
-                  ✏️ Edit
-                </button>
-                <button class="btn btn-sm" style="background: #0ea5e9; color: white;" onclick="openProductActivityLog('${productId.replace(/'/g, "\\'")}', '${(product.title || '').replace(/'/g, "\\'")}' || 'Product')" title="View Activity Log">
-                  📋 Activity
-                </button>
-                <button class="btn btn-sm btn-primary" onclick="publishProduct('${productId.replace(/'/g, "\\'")}')" title="Publish using active Stage/Prod mode">
-                  📤 Active (${getActivePublishLabel()})
-                </button>
-                <button class="btn btn-sm" style="background: #6366f1; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'sandbox')" title="Force publish to Sandbox">
-                  📦 Force Sandbox
-                </button>
-                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="publishProduct('${productId.replace(/'/g, "\\'")}', 'production')" title="Force publish to Production">
-                  🌐 Force Prod
-                </button>
-              </div>
-              <div id="status-${btoa(productId).replace(/=/g, '')}" style="display: none; margin-top: 8px; padding: 8px; border-radius: 4px; font-size: 12px;"></div>
-            </td>
-          </tr>
-        `;
-      }).join('');
-      
+      tbody.innerHTML = paginatedProducts.map(productRowHtml).join('');
+
       table.style.display = 'block';
-      
+
       // Update pagination
       updatePagination();
     }
@@ -2562,6 +2901,73 @@
       }
     }
 
+    // Same option set as buildEbayCategoryOptions() above, but returned as an
+    // HTML string so it can be dropped into the products table's inline-edit
+    // <select> without needing a DOM element to already exist.
+    function getEbayCategoryOptionsHtml(selectedCategoryId, selectedCategory) {
+      const seen = new Map();
+      for (const p of allProducts) {
+        const id = String(p.ebayCategoryId || '').trim();
+        const name = String(p.ebayCategory || '').trim();
+        if (!id && !name) continue;
+        const key = `${id}|||${name}`;
+        if (!seen.has(key)) seen.set(key, { id, name });
+      }
+      const sorted = Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+      const selectedKey = `${String(selectedCategoryId || '').trim()}|||${String(selectedCategory || '').trim()}`;
+
+      let matchedExisting = false;
+      let html = '<option value="">— Not set —</option>';
+      for (const { id, name } of sorted) {
+        const key = `${id}|||${name}`;
+        const label = id ? `${id} — ${name || '(no name)'}` : (name || '(unnamed)');
+        if (key === selectedKey) matchedExisting = true;
+        html += `<option value="${escapeHtmlAttr(key)}" ${key === selectedKey ? 'selected' : ''}>${escapeHtmlAttr(label)}</option>`;
+      }
+      if (!matchedExisting && (selectedCategoryId || selectedCategory)) {
+        const label = selectedCategoryId ? `${selectedCategoryId} — ${selectedCategory || '(no name)'}` : (selectedCategory || '(unnamed)');
+        html += `<option value="${escapeHtmlAttr(selectedKey)}" selected>${escapeHtmlAttr(label)}</option>`;
+      }
+      return html;
+    }
+
+    // Rich-text description editor helpers
+    function setRteContent(el, value) {
+      const str = String(value || '');
+      const looksLikeHtml = /<[a-z][\s\S]*>/i.test(str);
+      if (looksLikeHtml) {
+        el.innerHTML = str;
+      } else {
+        const escaped = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const paragraphs = escaped.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+        el.innerHTML = paragraphs.map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+      }
+    }
+
+    function rteExec(command, value = null) {
+      document.getElementById('editProductDescription').focus();
+      document.execCommand(command, false, value);
+    }
+
+    function rteInsertLink() {
+      const url = prompt('Link URL:', 'https://');
+      if (!url) return;
+      rteExec('createLink', url);
+    }
+
+    function renderEditProductImages(product) {
+      const container = document.getElementById('editProductImages');
+      const images = (product.imageSourceUrls && product.imageSourceUrls.length ? product.imageSourceUrls : product.images) || [];
+      if (!images.length) {
+        container.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">No images</span>';
+        return;
+      }
+      container.innerHTML = images.slice(0, 8).map((src) => {
+        const url = /^https?:\/\//i.test(src) ? src : `http://localhost:3001${src}`;
+        return `<img src="${url}" alt="" style="width: 120px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);">`;
+      }).join('');
+    }
+
     async function openEditProductModal(productId) {
       try {
         const response = await fetch(`http://localhost:3001/api/products/${productId}`);
@@ -2572,7 +2978,8 @@
         document.getElementById('editProductId').value = productId;
         document.getElementById('editProductSku').value = product.sku || product.customLabel || '';
         document.getElementById('editProductTitle').value = product.title || '';
-        document.getElementById('editProductDescription').value = product.description || '';
+        setRteContent(document.getElementById('editProductDescription'), product.description || '');
+        renderEditProductImages(product);
         document.getElementById('editProductPrice').value = product.price || '';
         document.getElementById('editProductInventory').value = product.inventoryQuantity || product.availableQuantity || product.inventory || '';
         buildEbayCategoryOptions(product.ebayCategoryId, product.ebayCategory);
@@ -2623,7 +3030,7 @@
         const productId = document.getElementById('editProductId').value;
         const sku = document.getElementById('editProductSku').value.trim();
         const title = document.getElementById('editProductTitle').value.trim();
-        const description = document.getElementById('editProductDescription').value;
+        const description = document.getElementById('editProductDescription').innerHTML.trim();
         const price = parseFloat(document.getElementById('editProductPrice').value) || null;
         const inventory = parseInt(document.getElementById('editProductInventory').value) || 0;
         const weightValue = parseFloat(document.getElementById('editWeightValue').value) || null;
@@ -4090,6 +4497,26 @@
     // ORDERS MANAGEMENT
     // ============================================================================
 
+    // Pagination state - resets to page 1 whenever a filter changes
+    let ordersOffset = 0;
+
+    function resetOrdersPageAndLoad() {
+      ordersOffset = 0;
+      loadOrders();
+    }
+
+    function ordersNextPage() {
+      const limit = parseInt(document.getElementById('order-limit-filter').value, 10);
+      ordersOffset += limit;
+      loadOrders();
+    }
+
+    function ordersPrevPage() {
+      const limit = parseInt(document.getElementById('order-limit-filter').value, 10);
+      ordersOffset = Math.max(0, ordersOffset - limit);
+      loadOrders();
+    }
+
     // Load orders from API
     async function loadOrders(forceRefresh = false) {
       const loadingEl = document.getElementById('orders-loading');
@@ -4099,6 +4526,9 @@
       const tableBody = document.getElementById('orders-table-body');
       const countBadge = document.getElementById('orders-count-badge');
       const cacheInfo = document.getElementById('orders-cache-info');
+      const pageInfoEl = document.getElementById('orders-page-info');
+      const prevBtn = document.getElementById('orders-prev-page');
+      const nextBtn = document.getElementById('orders-next-page');
 
       // Show loading
       loadingEl.style.display = 'block';
@@ -4116,6 +4546,7 @@
         const params = new URLSearchParams({
           source,
           limit,
+          offset: String(ordersOffset),
           forceRefresh: forceRefresh ? '1' : '0'
         });
 
@@ -4133,7 +4564,15 @@
         }
 
         const orders = data.orders || [];
-        
+        const total = data.total || 0;
+        const limitNum = parseInt(limit, 10);
+
+        pageInfoEl.textContent = total > 0
+          ? `Showing ${ordersOffset + 1}-${Math.min(ordersOffset + orders.length, total)} of ${total}`
+          : '';
+        prevBtn.disabled = ordersOffset === 0;
+        nextBtn.disabled = ordersOffset + limitNum >= total;
+
         // Update cache info
         if (data.cached) {
           const cacheAgeMinutes = Math.floor(data.cacheAge / 60000);
@@ -4145,10 +4584,13 @@
         }
 
         // Update count badge
-        countBadge.textContent = `${orders.length} orders`;
+        countBadge.textContent = `${total} orders`;
 
         if (orders.length === 0) {
           emptyEl.style.display = 'flex';
+          pageInfoEl.textContent = '';
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
           return;
         }
 
@@ -4159,17 +4601,23 @@
           const orderDate = new Date(order.creationDate).toLocaleDateString();
           const buyerId = order.buyer?.username || 'N/A';
           const buyerName = order.shippingAddress?.fullName || order.buyer?.name || 'N/A';
-          const sku = order.lineItems?.[0]?.sku || 'N/A';
-          const qty = order.lineItems?.[0]?.quantity || 0;
-          const orderEarnings = order.orderEarnings || '0.00';
-          const ebayCharges = order.ebayCharges || '0.00';
-          let total = order.orderTotal;
-          if (total == null || total === '' || isNaN(Number(total))) {
-            total = '0.00';
-          } else {
-            total = Number(total).toFixed(2);
-          }
-          const currency = order.lineItems?.[0]?.total?.currency || order.pricingSummary?.total?.currency || 'USD';
+          const sku = (order.lineItems && order.lineItems.length)
+            ? order.lineItems.map(item => item.sku || 'N/A').join(', ')
+            : 'N/A';
+          const qty = (order.lineItems && order.lineItems.length)
+            ? order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)
+            : 0;
+          const formatFee = (value) => (value == null || value === '' || isNaN(Number(value))) ? '—' : Number(value).toFixed(2);
+          const orderEarnings = formatFee(order.orderEarnings);
+          const ebayCharges = formatFee(order.ebayCharges);
+          const salesTax = formatFee(order.salesTax);
+          const transactionFee = formatFee(order.transactionFee);
+          const adFee = formatFee(order.adFee);
+          const shippingLabelFee = formatFee(order.shippingLabelFee);
+          const feesWarning = order.feesComplete === false
+            ? ` title="${(order.feesNote || 'Incomplete: missing some eBay fees').replace(/"/g, '&quot;')}" style="cursor: help; border-bottom: 1px dotted var(--text-secondary);"`
+            : '';
+          const total = formatFee(order.orderTotal);
           const fulfillmentStatus = order.orderFulfillmentStatus || 'UNKNOWN';
           const paymentStatus = order.orderPaymentStatus || 'UNKNOWN';
 
@@ -4200,9 +4648,13 @@
               <td style="padding: 12px;">${buyerName}</td>
               <td style="padding: 12px;">${sku}</td>
               <td style="padding: 12px;">${qty}</td>
-              <td style="padding: 12px;">${orderEarnings}</td>
-              <td style="padding: 12px;">${ebayCharges}</td>
-              <td style="padding: 12px;">${currency} ${total}</td>
+              <td style="padding: 12px;">${total}</td>
+              <td style="padding: 12px;"><span${feesWarning}>${orderEarnings}</span></td>
+              <td style="padding: 12px;"><span${feesWarning}>${ebayCharges}</span></td>
+              <td style="padding: 12px;">${salesTax}</td>
+              <td style="padding: 12px;">${transactionFee}</td>
+              <td style="padding: 12px;">${adFee}</td>
+              <td style="padding: 12px;" title="Not available via any eBay API when the label wasn't purchased through eBay's own shipping service">${shippingLabelFee}</td>
               <td style="padding: 12px;">
                 <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; ${statusStyle}">
                   ${fulfillmentStatus.replace(/_/g, ' ')}
@@ -4212,6 +4664,11 @@
                 <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; ${paymentStyle}">
                   ${paymentStatus}
                 </span>
+              </td>
+              <td style="padding: 12px;" id="label-action-${orderId}">
+                ${order.labelPurchased
+                  ? `<a href="/data/labels/${orderId}/label.pdf" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: 600;">📄 View Label</a>`
+                  : `<button class="btn btn-secondary" style="white-space: nowrap;" onclick="purchaseShippingLabel('${orderId}')">📦 Get Label</button>`}
               </td>
             </tr>
           `;
@@ -4688,6 +5145,30 @@
         content.innerHTML = html;
       } catch (err) {
         content.innerHTML = `<div style="padding: 32px; text-align: center; color: var(--color-danger);">❌ Failed to load order details<br>${err.message}</div>`;
+      }
+    }
+
+    async function purchaseShippingLabel(orderId) {
+      const cell = document.getElementById(`label-action-${orderId}`);
+      if (!cell) return;
+      const originalHtml = cell.innerHTML;
+      cell.innerHTML = '<span style="color: var(--text-secondary);">⏳ Buying label…</span>';
+      try {
+        const resp = await fetch(`http://localhost:3001/api/orders/${orderId}/purchase-label`, { method: 'POST' });
+        const data = await resp.json();
+        if (!data.success) throw Object.assign(new Error(data.error || 'Failed to purchase label'), { errorType: data.errorType });
+        cell.innerHTML = `<a href="${data.labelUrl}" target="_blank" style="color: #2563eb; text-decoration: underline; font-weight: 600;">📄 View Label</a>`;
+        showToast(
+          `Label purchased${data.price != null ? ` ($${data.price.toFixed(2)})` : ''}${data.sheetUpdated ? ' and synced to sheet' : ' (sheet sync skipped/failed - check logs)'}`,
+          'success'
+        );
+      } catch (err) {
+        cell.innerHTML = originalHtml;
+        if (err.errorType === 'session_expired') {
+          showToast('eBay session expired - run `npm run ebay:login-setup` to re-authenticate, then try again.', 'error', 8000);
+        } else {
+          showToast(`Failed to purchase label: ${err.message}`, 'error', 8000);
+        }
       }
     }
 
